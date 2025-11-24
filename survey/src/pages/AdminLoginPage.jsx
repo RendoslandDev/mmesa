@@ -16,7 +16,7 @@ export const AdminLoginPage = ({ onLoginSuccess, onNavigate }) => {
         try {
             // Use a relative URL so the browser targets the same origin (allowing your dev server proxy
             // to forward requests to the backend), which avoids CORS issues when configured.
-            const res = await fetch('/api/admin/login', {
+            const res = await fetch('https://mmesa-server.vercel.app/api/admin/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password }),
