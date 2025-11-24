@@ -7,6 +7,14 @@ import bcrypt from 'bcryptjs';
 dotenv.config();
 
 export async function login(req, res) {
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Origin', 'https://mmesa-client.vercel.app');
+    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
+
     try {
         const { username, password } = req.body;
 

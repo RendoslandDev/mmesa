@@ -2,6 +2,10 @@ import { query, pool } from '../config/database.js';
 
 
 export async function submitSurvey(req, res) {
+    if (req.method !== 'POST') {
+        res.setHeader('Allow', ['POST']);
+        return res.status(405).json({ success: false, error: `Method ${req.method} Not Allowed` });
+    }
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', 'https://mmesa-client.vercel.app');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
