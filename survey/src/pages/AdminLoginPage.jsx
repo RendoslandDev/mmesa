@@ -116,14 +116,14 @@ export const AdminLoginPage = ({ onLoginSuccess, onNavigate }) => {
                 >
                     Back to Survey
                 </button>
-
+                {/* 
                 <div className="mt-6 p-4 bg-blue-50 rounded-xl">
                     <p className="text-sm text-blue-900">
                         <strong>Demo Credentials:</strong><br />
                         Username: admin<br />
                         Password: admin123
                     </p>
-                </div>
+                </div> */}
             </div>
         </div>
     );
