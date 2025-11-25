@@ -16,14 +16,34 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Middleware
+// // Middleware
+// const corsOptions = {
+//     origin: process.env.FRONTEND_URL,
+//     credentials: true,
+//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+//     maxAge: 86400 // 24 hours
+// };
+// app.use(cors(corsOptions));
+const allowedOrigins = [
+    'http://localhost:5173',
+    process.env.FRONTEND_URL
+];
+
 const corsOptions = {
-    origin: process.env.FRONTEND_URL,
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error(`CORS not allowed from origin ${origin}`));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    maxAge: 86400 // 24 hours
+    maxAge: 86400
 };
+
 app.use(cors(corsOptions));
 
 app.use(express.json());
