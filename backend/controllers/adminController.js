@@ -60,6 +60,9 @@ export async function login(req, res) {
             error: error.message
         });
     }
+    console.log('Admin record:', admin);
+    console.log('Password valid?', isPasswordValid);
+
 }
 
 export async function getAdminStats(req, res) {
