@@ -141,21 +141,71 @@ export async function getAdminStats(req, res) {
     }
 }
 
+// export async function exportToCSV(req, res) {
+//     try {
+//         const results = await query(
+//             `SELECT sr.id, s.email, s.index_number, s.year_of_study, s.whatsapp_phone, 
+//                     sr.selected_option, sr.submitted_at
+//              FROM survey_responses sr
+//              JOIN students s ON sr.student_id = s.id
+//              ORDER BY sr.submitted_at DESC`
+//         );
+// 
+//         let csv = 'ID,Email,Index Number,Year of Study,WhatsApp Phone,Selected Option,Submitted At\n';
+// 
+//         results.forEach(row => {
+//             const submittedAt = row.submitted_at.toISOString(); // convert timestamp to ISO string
+//             csv += `${row.id},"${row.email}","${row.index_number}","${row.year_of_study}","${row.whatsapp_phone}","${row.selected_option}","${submittedAt}"\n`;
+//         });
+// 
+//         res.setHeader('Content-Type', 'text/csv');
+//         res.setHeader('Content-Disposition', 'attachment; filename=survey_responses.csv');
+//         res.send(csv);
+// 
+//     } catch (error) {
+//         console.error('CSV export error:', error);
+//         res.status(500).json({ success: false, error: error.message });
+//     }
+// }
 export async function exportToCSV(req, res) {
     try {
-        const results = await query(
-            `SELECT sr.id, s.email, s.index_number, s.year_of_study, s.whatsapp_phone, 
-                    sr.selected_option, sr.submitted_at
-             FROM survey_responses sr
-             JOIN students s ON sr.student_id = s.id
-             ORDER BY sr.submitted_at DESC`
-        );
+        const results = await query(`
+            SELECT 
+                sr.id AS response_id,
+                s.email,
+                s.index_number,
+                s.year_of_study,
+                s.whatsapp_phone,
+                sr.selected_option,
+                sr.submitted_at,
+                -- Collect modules
+                COALESCE((
+                    SELECT STRING_AGG(m.module_name, ', ')
+                    FROM student_module_selections sms
+                    JOIN modules m ON sms.module_id = m.id
+                    WHERE sms.response_id = sr.id
+                ), '') AS selected_modules,
+                -- Collect software
+                COALESCE((
+                    SELECT STRING_AGG(sw.software_name, ', ')
+                    FROM student_software_selections sss
+                    JOIN software sw ON sss.software_id = sw.id
+                    WHERE sss.response_id = sr.id
+                ), '') AS selected_software,
+                -- Total responses
+                (SELECT COUNT(*) FROM survey_responses) AS total_responses
+            FROM survey_responses sr
+            JOIN students s ON sr.student_id = s.id
+            ORDER BY sr.submitted_at DESC
+        `);
 
-        let csv = 'ID,Email,Index Number,Year of Study,WhatsApp Phone,Selected Option,Submitted At\n';
+        let csv =
+            'ID,Email,Index Number,Year of Study,WhatsApp Phone,Selected Option,Selected Modules,Selected Software,Total Responses,Submitted At\n';
 
         results.forEach(row => {
-            const submittedAt = row.submitted_at.toISOString(); // convert timestamp to ISO string
-            csv += `${row.id},"${row.email}","${row.index_number}","${row.year_of_study}","${row.whatsapp_phone}","${row.selected_option}","${submittedAt}"\n`;
+            const submittedAt = row.submitted_at.toISOString();
+
+            csv += `${row.response_id},"${row.email}","${row.index_number}","${row.year_of_study}","${row.whatsapp_phone}","${row.selected_option}","${row.selected_modules}","${row.selected_software}",${row.total_responses},"${submittedAt}"\n`;
         });
 
         res.setHeader('Content-Type', 'text/csv');
@@ -167,6 +217,7 @@ export async function exportToCSV(req, res) {
         res.status(500).json({ success: false, error: error.message });
     }
 }
+
 
 export default {
     login,
