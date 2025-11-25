@@ -178,34 +178,25 @@ export async function exportToCSV(req, res) {
                 s.whatsapp_phone,
                 sr.selected_option,
                 sr.submitted_at,
-                -- Collect modules
-                COALESCE((
-                    SELECT STRING_AGG(m.module_name, ', ')
-                    FROM student_module_selections sms
-                    JOIN modules m ON sms.module_id = m.id
-                    WHERE sms.response_id = sr.id
-                ), '') AS selected_modules,
-                -- Collect software
-                COALESCE((
-                    SELECT STRING_AGG(sw.software_name, ', ')
-                    FROM student_software_selections sss
-                    JOIN software sw ON sss.software_id = sw.id
-                    WHERE sss.response_id = sr.id
-                ), '') AS selected_software,
-                -- Total responses
-                (SELECT COUNT(*) FROM survey_responses) AS total_responses
+                -- Aggregate modules
+                COALESCE(string_agg(DISTINCT m.name, '; '), '') AS selected_modules,
+                -- Aggregate software
+                COALESCE(string_agg(DISTINCT sw.name, '; '), '') AS selected_software
             FROM survey_responses sr
             JOIN students s ON sr.student_id = s.id
+            LEFT JOIN student_module_selections sms ON sr.id = sms.response_id
+            LEFT JOIN modules m ON sms.module_id = m.id
+            LEFT JOIN student_software_selections sss ON sr.id = sss.response_id
+            LEFT JOIN software sw ON sss.software_id = sw.id
+            GROUP BY sr.id, s.email, s.index_number, s.year_of_study, s.whatsapp_phone, sr.selected_option, sr.submitted_at
             ORDER BY sr.submitted_at DESC
         `);
 
-        let csv =
-            'ID,Email,Index Number,Year of Study,WhatsApp Phone,Selected Option,Selected Modules,Selected Software,Total Responses,Submitted At\n';
+        let csv = 'Response ID,Email,Index Number,Year of Study,WhatsApp Phone,Selected Option,Selected Modules,Selected Software,Submitted At\n';
 
         results.forEach(row => {
             const submittedAt = row.submitted_at.toISOString();
-
-            csv += `${row.response_id},"${row.email}","${row.index_number}","${row.year_of_study}","${row.whatsapp_phone}","${row.selected_option}","${row.selected_modules}","${row.selected_software}",${row.total_responses},"${submittedAt}"\n`;
+            csv += `${row.response_id},"${row.email}","${row.index_number}","${row.year_of_study}","${row.whatsapp_phone}","${row.selected_option}","${row.selected_modules}","${row.selected_software}","${submittedAt}"\n`;
         });
 
         res.setHeader('Content-Type', 'text/csv');
