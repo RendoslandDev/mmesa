@@ -3,7 +3,7 @@ const HomePage = ({ onNavigate }) => {
         <>
 
             <div className="px-4 py-12">
-                <div className="text-center mb-12">
+                <div className="text-center ">
                     <div className="w-20 h-20 bg-black rounded-full flex items-center justify-center mx-auto mb-6">
                         <BookOpen className="text-white" size={40} />
                     </div>
