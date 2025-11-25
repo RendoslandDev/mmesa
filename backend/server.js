@@ -25,19 +25,10 @@ const app = express();
 //     maxAge: 86400 // 24 hours
 // };
 // app.use(cors(corsOptions));
-const allowedOrigins = [
-    'http://localhost:5173',
-    process.env.FRONTEND_URL
-];
-
 const corsOptions = {
-    origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error(`CORS not allowed from origin ${origin}`));
-        }
-    },
+    origin: process.env.NODE_ENV === 'production'
+        ? process.env.FRONTEND_URL
+        : ['http://localhost:5173', process.env.FRONTEND_URL],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -99,7 +90,7 @@ app.listen(PORT, () => {
     console.log('\n✅ ==================== SERVER STARTED ====================');
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🌐 Frontend URL: ${corsOptions.origin}`);
+    console.log('🌐 Allowed origins:', allowedOrigins);
     console.log(`🔧 CORS Enabled: true`);
     console.log(`📍 Base URL: http://localhost:${PORT}`);
     console.log('=========================================================\n');
@@ -113,6 +104,7 @@ app.listen(PORT, () => {
     console.log('   GET    /api/admin/export');
     console.log('   GET    /api/health\n');
 });
+
 
 
 export default app;
