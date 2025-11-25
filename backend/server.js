@@ -16,13 +16,24 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// // Middleware
-app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    credentials: true // if you want cookies/auth headers
-}));
+const allowedOrigins = [
+    'http://localhost:5173', // local dev
+    'https://mmesa-survey.onrender.com' // production frontend
+];
 
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true
+};
+
+app.use(cors(corsOptions));
 
 
 
@@ -67,6 +78,7 @@ app.listen(PORT, () => {
     console.log('\n✅ ==================== SERVER STARTED ====================');
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log('🌐 Allowed origins:', allowedOrigins);
     console.log(`🔧 CORS Enabled: true`);
     console.log(`📍 Base URL: http://localhost:${PORT}`);
     console.log('=========================================================\n');
