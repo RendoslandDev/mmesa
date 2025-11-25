@@ -17,19 +17,13 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // // Middleware
-const allowedOrigins = [
-    'http://localhost:5173',
-    'https://mmesa-survey.onrender.com'  // <- your frontend URL
-];
-
-const corsOptions = {
-    origin: allowedOrigins,
-    credentials: true,
+app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-};
+    credentials: true // if you want cookies/auth headers
+}));
 
-app.use(cors(corsOptions));
+
 
 
 app.use(express.json());
@@ -61,12 +55,6 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
     console.error(err.stack);
-
-    res.header('Access-Control-Allow-Origin', req.headers.origin || process.env.FRONTEND_URL);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-
     res.status(err.status || 500).json({
         success: false,
         error: err.message || 'Internal server error'
@@ -79,7 +67,6 @@ app.listen(PORT, () => {
     console.log('\n✅ ==================== SERVER STARTED ====================');
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log('🌐 Allowed origins:', allowedOrigins);
     console.log(`🔧 CORS Enabled: true`);
     console.log(`📍 Base URL: http://localhost:${PORT}`);
     console.log('=========================================================\n');
