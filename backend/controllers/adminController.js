@@ -178,9 +178,7 @@ export async function exportToCSV(req, res) {
                 s.whatsapp_phone,
                 sr.selected_option,
                 sr.submitted_at,
-                -- Aggregate modules
                 COALESCE(string_agg(DISTINCT m.name, '; '), '') AS selected_modules,
-                -- Aggregate software
                 COALESCE(string_agg(DISTINCT sw.name, '; '), '') AS selected_software
             FROM survey_responses sr
             JOIN students s ON sr.student_id = s.id
@@ -208,6 +206,7 @@ export async function exportToCSV(req, res) {
         res.status(500).json({ success: false, error: error.message });
     }
 }
+
 
 
 export default {
