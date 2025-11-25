@@ -3,8 +3,8 @@ const HomePage = ({ onNavigate }) => {
         <>
 
             <div className="px-4 py-12">
-                <div className="text-center mb-12">
-                    <div className="w-20 h-20 bg-black rounded-full flex items-center justify-center mx-auto mb-6">
+                <div className="text-center mb-6">
+                    <div className="w-20 h-20 bg-black rounded-full flex items-center justify-center mx-auto ">
                         <BookOpen className="text-white" size={40} />
                     </div>
                     <h1 className="text-4xl font-bold mb-3">MMESA Survey</h1>
@@ -12,7 +12,7 @@ const HomePage = ({ onNavigate }) => {
                     <p className="text-gray-500">Phase 2 • Module Selection</p>
                 </div>
                 <HeroSection />
-                <div className="max-w-full sm:max-w-md md:max-w-2xl lg:max-w-3xl mx-auto flex flex-col sm:flex-row gap-4 sm:gap-6 p-4 sm:p-6 md:p-8 bg-white shadow-md rounded-xl border border-gray-200">
+                <div className="max-w-full sm:max-w-md md:max-w-2xl lg:max-w-3xl mx-auto flex flex-col sm:flex-row gap-4 sm:gap-6 p-4 sm:p-6 md:p-8 bg-white shadow-md rounded-xl border border-gray-200 mt-12">
 
                     <button
                         onClick={() => onNavigate('student-info')}
