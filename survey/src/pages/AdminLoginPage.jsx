@@ -14,22 +14,10 @@ export const AdminLoginPage = ({ onLoginSuccess, onNavigate }) => {
         setError(null);
 
         try {
-            // Use a relative URL so the browser targets the same origin (allowing your dev server proxy
-            // to forward requests to the backend), which avoids CORS issues when configured.
-            const res = await fetch('/admin/login', {
+            const response = await apiCall('/admin/login', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password }),
             });
-
-            if (!res.ok) {
-                // Try to read error body for a clearer message
-                const errText = await res.text().catch(() => null);
-                throw new Error(errText || `Request failed with status ${res.status}`);
-            }
-
-            const response = await res.json();
-
             if (response.success) {
                 localStorage.setItem('adminToken', response.token);
                 localStorage.setItem('adminUser', JSON.stringify(response.admin));

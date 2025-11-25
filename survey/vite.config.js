@@ -9,5 +9,8 @@ export default defineConfig({
     outDir: 'dist',
   },
   plugins: [react(), tailwindcss()],
+  proxy: {
+    '/api': 'http://localhost:5000/api',
+  },
 
 })

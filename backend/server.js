@@ -18,7 +18,7 @@ const app = express();
 
 // Middleware
 const corsOptions = {
-    origin: process.env.FRONTEND_URL || 'http://mmesa-client.vercel.app',
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173/api',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

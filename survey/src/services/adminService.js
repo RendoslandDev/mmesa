@@ -1,4 +1,3 @@
-
 import { apiCall } from './api.js';
 
 const adminService = {
@@ -10,15 +9,13 @@ const adminService = {
     },
 
     getStats: async (token) => {
-        const headers = {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        };
-
         try {
-            const resp = await fetch('/api/admin/stats', { headers });
-            if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
-            return await resp.json();
+            return await apiCall('/admin/stats', {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
         } catch (err) {
             console.error('Error fetching admin stats:', err);
             throw err;
@@ -27,17 +24,27 @@ const adminService = {
 
     exportToCSV: async (token) => {
         try {
-            const resp = await fetch('/api/admin/export', {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
-            return await resp.blob(); // blob for CSV
+            // CSV request must NOT parse JSON
+            const res = await fetch(
+                `${import.meta.env.VITE_API_URL}/admin/export`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (!res.ok) {
+                const errText = await res.text().catch(() => null);
+                throw new Error(errText || `HTTP error! ${res.status}`);
+            }
+
+            return await res.blob();
         } catch (err) {
             console.error('Error exporting CSV:', err);
             throw err;
         }
     },
-
 };
 
 export default adminService;
