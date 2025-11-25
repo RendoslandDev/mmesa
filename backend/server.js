@@ -19,19 +19,18 @@ const app = express();
 // // Middleware
 const allowedOrigins = [
     'http://localhost:5173',
-    process.env.FRONTEND_URL
+    'https://mmesa-survey.onrender.com'  // <- your frontend URL
 ];
+
 const corsOptions = {
-    origin: process.env.NODE_ENV === 'production'
-        ? process.env.FRONTEND_URL
-        : ['http://localhost:5173', process.env.FRONTEND_URL],
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    maxAge: 86400
+    allowedHeaders: ['Content-Type', 'Authorization']
 };
 
 app.use(cors(corsOptions));
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
