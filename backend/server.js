@@ -17,20 +17,24 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 const allowedOrigins = [
-    'http://localhost:5173', // local dev
-    'https://mmesa-survey.onrender.com' // production frontend
+    'http://localhost:5173',                  // local frontend
+    process.env.FRONTEND_URL,                 // production frontend
+    process.env.BACKEND_URL || 'http://localhost:5000'  // backend origin if needed
 ];
 
+// CORS options
 const corsOptions = {
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
+        // Allow requests with no origin (e.g., Postman, server-to-server)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            return callback(new Error(`CORS policy: ${origin} not allowed`));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    credentials: true
+    credentials: true // allow Authorization headers/cookies
 };
 
 app.use(cors(corsOptions));
