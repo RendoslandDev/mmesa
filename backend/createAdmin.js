@@ -10,25 +10,30 @@ async function createOrUpdateAdmin() {
         const password = process.env.ADMIN_PASSWORD || 'admin123';
         const role = 'admin';
 
-        // Hash the password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Check if admin already exists
-        const admins = await query('SELECT * FROM admin_users WHERE username = ? LIMIT 1', [username]);
+        const admins = await query(
+            'SELECT * FROM admin_users WHERE username = $1 LIMIT 1',
+            [username]
+        );
 
         if (admins.length > 0) {
-            // Update password if admin exists
-            await query('UPDATE admin_users SET password_hash = ? WHERE username = ?', [hashedPassword, username]);
-            console.log(`Admin user "${username}" already exists. Password updated.`);
+            await query(
+                'UPDATE admin_users SET password_hash = $1 WHERE username = $2',
+                [hashedPassword, username]
+            );
+            console.log(`Admin "${username}" exists → password updated.`);
         } else {
-            // Insert new admin
-            await query('INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, ?)', [username, hashedPassword, role]);
-            console.log(`Admin user "${username}" created successfully.`);
+            await query(
+                'INSERT INTO admin_users (username, password_hash, role) VALUES ($1, $2, $3)',
+                [username, hashedPassword, role]
+            );
+            console.log(`Admin "${username}" created.`);
         }
 
         process.exit(0);
     } catch (error) {
-        console.error('Error creating/updating admin:', error);
+        console.error('Error:', error);
         process.exit(1);
     }
 }
