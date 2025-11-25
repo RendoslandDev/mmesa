@@ -1,4 +1,3 @@
-// config/database.js
 import pkg from 'pg';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -6,17 +5,17 @@ dotenv.config();
 const { Pool } = pkg;
 
 export const pool = new Pool({
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 5432,
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'mmesa_survey',
-    max: 20,              // max number of clients in the pool
-    idleTimeoutMillis: 30000,  // close idle clients after 30s
-    connectionTimeoutMillis: 2000 // return an error after 2s if connection could not be established
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT) || 5432,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false, // enable SSL
+    max: 100,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000
 });
 
-// Simple helper function for queries
 export async function query(text, params) {
     const client = await pool.connect();
     try {
@@ -27,7 +26,7 @@ export async function query(text, params) {
     }
 }
 
-// Test the connection
+// Test connection
 pool.connect()
     .then(client => {
         console.log('✅ PostgreSQL connected successfully');
