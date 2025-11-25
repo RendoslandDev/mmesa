@@ -1,6 +1,79 @@
 import { pool } from '../config/database.js';
 
 // ==================== SUBMIT SURVEY ====================
+// export async function submitSurvey(req, res) {
+//     const client = await pool.connect();
+// 
+//     try {
+//         const {
+//             email,
+//             indexNumber,
+//             yearOfStudy,
+//             whatsappPhone,
+//             selectedOption,
+//             selectedModules = [],
+//             selectedSoftware = [],
+//             additionalCourses
+//         } = req.body;
+// 
+//         if (!email || !indexNumber || !yearOfStudy || !selectedOption) {
+//             return res.status(400).json({ success: false, error: 'Missing required fields' });
+//         }
+// 
+//         await client.query('BEGIN');
+// 
+//         // Upsert student
+//         const studentUpsertQuery = `
+//             INSERT INTO students (email, index_number, year_of_study, whatsapp_phone)
+//             VALUES ($1, $2, $3, $4)
+//             ON CONFLICT (email) DO UPDATE
+//             SET whatsapp_phone = EXCLUDED.whatsapp_phone
+//             RETURNING id
+//         `;
+//         const studentResult = await client.query(studentUpsertQuery, [email, indexNumber, yearOfStudy, whatsappPhone]);
+//         const studentId = studentResult.rows[0].id;
+// 
+//         // Insert survey response
+//         const responseQuery = `
+//             INSERT INTO survey_responses (student_id, selected_option, additional_courses, submitted_at)
+//             VALUES ($1, $2, $3, NOW())
+//             RETURNING id
+//         `;
+//         const responseResult = await client.query(responseQuery, [studentId, selectedOption, additionalCourses || null]);
+//         const responseId = responseResult.rows[0].id;
+// 
+//         // Bulk insert modules
+//         if (selectedModules.length > 0) {
+//             const moduleValues = selectedModules.map((mId) => `(${studentId}, ${responseId}, ${mId})`).join(',');
+//             await client.query(`
+//                 INSERT INTO student_module_selections (student_id, response_id, module_id)
+//                 VALUES ${moduleValues}
+//             `);
+//         }
+// 
+//         // Bulk insert software
+//         if (selectedSoftware.length > 0) {
+//             const softwareValues = selectedSoftware.map((sId) => `(${studentId}, ${responseId}, ${sId})`).join(',');
+//             await client.query(`
+//                 INSERT INTO student_software_selections (student_id, response_id, software_id)
+//                 VALUES ${softwareValues}
+//             `);
+//         }
+// 
+//         await client.query('COMMIT');
+// 
+//         res.json({ success: true, message: 'Survey submitted successfully', responseId });
+//     } catch (error) {
+//         await client.query('ROLLBACK');
+//         console.error('Survey submission error:', error);
+//         res.status(500).json({ success: false, error: error.message });
+//     } finally {
+//         client.release();
+//     }
+// }
+import { pool } from '../config/database.js';
+
+// ==================== SUBMIT SURVEY ====================
 export async function submitSurvey(req, res) {
     const client = await pool.connect();
 
@@ -23,46 +96,80 @@ export async function submitSurvey(req, res) {
         await client.query('BEGIN');
 
         // Upsert student
-        const studentUpsertQuery = `
+        const studentResult = await client.query(
+            `
             INSERT INTO students (email, index_number, year_of_study, whatsapp_phone)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (email) DO UPDATE
             SET whatsapp_phone = EXCLUDED.whatsapp_phone
             RETURNING id
-        `;
-        const studentResult = await client.query(studentUpsertQuery, [email, indexNumber, yearOfStudy, whatsappPhone]);
+            `,
+            [email, indexNumber, yearOfStudy, whatsappPhone]
+        );
         const studentId = studentResult.rows[0].id;
 
+        // Check if student already submitted
+        const existingResponse = await client.query(
+            `SELECT id FROM survey_responses WHERE student_id = $1`,
+            [studentId]
+        );
+        if (existingResponse.rows.length > 0) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ success: false, error: 'You have already submitted the survey' });
+        }
+
         // Insert survey response
-        const responseQuery = `
+        const responseResult = await client.query(
+            `
             INSERT INTO survey_responses (student_id, selected_option, additional_courses, submitted_at)
             VALUES ($1, $2, $3, NOW())
             RETURNING id
-        `;
-        const responseResult = await client.query(responseQuery, [studentId, selectedOption, additionalCourses || null]);
+            `,
+            [studentId, selectedOption, additionalCourses || null]
+        );
         const responseId = responseResult.rows[0].id;
 
-        // Bulk insert modules
+        // Validate module IDs
+        let validModuleIds = [];
         if (selectedModules.length > 0) {
-            const moduleValues = selectedModules.map((mId) => `(${studentId}, ${responseId}, ${mId})`).join(',');
-            await client.query(`
-                INSERT INTO student_module_selections (student_id, response_id, module_id)
-                VALUES ${moduleValues}
-            `);
+            const moduleResult = await client.query(
+                `SELECT id FROM modules WHERE id = ANY($1::int[])`,
+                [selectedModules]
+            );
+            validModuleIds = moduleResult.rows.map(r => r.id);
         }
 
-        // Bulk insert software
+        // Bulk insert valid modules
+        for (const mId of validModuleIds) {
+            await client.query(
+                `INSERT INTO student_module_selections (student_id, response_id, module_id)
+                 VALUES ($1, $2, $3)`,
+                [studentId, responseId, mId]
+            );
+        }
+
+        // Validate software IDs
+        let validSoftwareIds = [];
         if (selectedSoftware.length > 0) {
-            const softwareValues = selectedSoftware.map((sId) => `(${studentId}, ${responseId}, ${sId})`).join(',');
-            await client.query(`
-                INSERT INTO student_software_selections (student_id, response_id, software_id)
-                VALUES ${softwareValues}
-            `);
+            const softwareResult = await client.query(
+                `SELECT id FROM software WHERE id = ANY($1::int[])`,
+                [selectedSoftware]
+            );
+            validSoftwareIds = softwareResult.rows.map(r => r.id);
+        }
+
+        // Bulk insert valid software
+        for (const sId of validSoftwareIds) {
+            await client.query(
+                `INSERT INTO student_software_selections (student_id, response_id, software_id)
+                 VALUES ($1, $2, $3)`,
+                [studentId, responseId, sId]
+            );
         }
 
         await client.query('COMMIT');
-
         res.json({ success: true, message: 'Survey submitted successfully', responseId });
+
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Survey submission error:', error);
@@ -71,6 +178,7 @@ export async function submitSurvey(req, res) {
         client.release();
     }
 }
+
 
 // ==================== GET RESULTS ====================
 export async function getResults(req, res) {
