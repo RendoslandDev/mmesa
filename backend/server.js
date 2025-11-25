@@ -50,6 +50,9 @@ app.get('/api/health', (req, res) => {
         corsOrigin: corsOptions.origin
     });
 });
+app.get('/', (req, res) => {
+    res.send('✅ Backend is live!');
+});
 
 // 404 handler
 app.use((req, res) => {
