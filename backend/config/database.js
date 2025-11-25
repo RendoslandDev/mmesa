@@ -1,28 +1,38 @@
-import mysql from 'mysql2/promise';
+// config/database.js
+import pkg from 'pg';
 import dotenv from 'dotenv';
-
 dotenv.config();
 
-export const pool = mysql.createPool({
+const { Pool } = pkg;
+
+export const pool = new Pool({
     host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
+    port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 5432,
+    user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'mmesa_survey',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+    max: 20,              // max number of clients in the pool
+    idleTimeoutMillis: 30000,  // close idle clients after 30s
+    connectionTimeoutMillis: 2000 // return an error after 2s if connection could not be established
 });
 
-export async function query(sql, values) {
+// Simple helper function for queries
+export async function query(text, params) {
+    const client = await pool.connect();
     try {
-        const connection = await pool.getConnection();
-        const [results] = await connection.query(sql, values);
-        connection.release();
-        return results;
-    } catch (error) {
-        console.error('Database error:', error);
-        throw error;
+        const res = await client.query(text, params);
+        return res.rows;
+    } finally {
+        client.release();
     }
 }
 
-export default pool;
+// Test the connection
+pool.connect()
+    .then(client => {
+        console.log('✅ PostgreSQL connected successfully');
+        client.release();
+    })
+    .catch(err => {
+        console.error('❌ PostgreSQL connection error:', err.stack);
+    });

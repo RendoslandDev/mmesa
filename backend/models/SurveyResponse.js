@@ -1,90 +1,72 @@
-const pool = require('../config/database');
+// models/SurveyResponse.js
+import { query } from '../config/database.js';
 
 class SurveyResponse {
-    static async create(studentId, selectedOption, additionalCourse = null) {
+    static async create(studentId, selectedOption, additionalCourses = null) {
         try {
-            const [result] = await pool.execute(
-                'INSERT INTO survey_responses (student_id, selected_option, additional_course_suggestion) VALUES (?, ?, ?)',
-                [studentId, selectedOption, additionalCourse]
+            const result = await query(
+                `INSERT INTO survey_responses (student_id, selected_option, additional_courses)
+                 VALUES ($1, $2, $3)
+                 RETURNING id`,
+                [studentId, selectedOption, additionalCourses]
             );
-            return result.insertId;
+            return result[0]?.id;
         } catch (error) {
             throw new Error('Failed to create survey response: ' + error.message);
         }
     }
 
     static async findById(responseId) {
-        const [rows] = await pool.execute(
-            'SELECT * FROM survey_responses WHERE response_id = ?',
+        const rows = await query(
+            `SELECT * FROM survey_responses WHERE id = $1`,
             [responseId]
         );
         return rows[0] || null;
     }
 
     static async findByStudent(studentId) {
-        const [rows] = await pool.execute(
-            'SELECT * FROM survey_responses WHERE student_id = ? ORDER BY submitted_at DESC',
+        return await query(
+            `SELECT * FROM survey_responses WHERE student_id = $1 ORDER BY submitted_at DESC`,
             [studentId]
         );
-        return rows;
     }
 
     static async getAll() {
-        const [rows] = await pool.execute(
-            'SELECT * FROM survey_responses ORDER BY submitted_at DESC'
+        return await query(
+            `SELECT * FROM survey_responses ORDER BY submitted_at DESC`
         );
-        return rows;
     }
 
-    // static async getStatistics() {
-    //     const [stats] = await pool.execute(`
-    //   SELECT 
-    //     COUNT(DISTINCT response_id) as total_responses,
-    //     selected_option,
-    //     COUNT(*) as option_count,
-    //     COUNT(DISTINCT student_id) as unique_students
-    //   FROM survey_responses
-    //   GROUP BY selected_option
-    // `);
-    //     return stats;
-    // }
     static async getStatistics() {
-        // Survey response counts and options
-        const [optionStats] = await pool.execute(`
-        SELECT selected_option, COUNT(*) as count
-        FROM survey_responses
-        GROUP BY selected_option
-    `);
+        const optionBreakdown = await query(`
+            SELECT selected_option, COUNT(*) as count
+            FROM survey_responses
+            GROUP BY selected_option
+        `);
 
-        // Total responses
-        const totalResponses = await this.getTotalCount();
+        const totalResponsesResult = await query(`SELECT COUNT(*) as count FROM survey_responses`);
+        const totalResponses = totalResponsesResult[0]?.count || 0;
 
-        // Total module selections
-        const totalModuleSelections = await this.getTotalModuleSelections();
+        const totalModuleSelectionsResult = await query(`SELECT COUNT(*) as count FROM student_module_selections`);
+        const totalModuleSelections = totalModuleSelectionsResult[0]?.count || 0;
 
-        // Total software selections
-        const totalSoftwareSelections = await this.getTotalSoftwareSelections();
+        const totalSoftwareSelectionsResult = await query(`SELECT COUNT(*) as count FROM student_software_selections`);
+        const totalSoftwareSelections = totalSoftwareSelectionsResult[0]?.count || 0;
 
         return {
             totalResponses,
             totalModuleSelections,
             totalSoftwareSelections,
-            optionBreakdown: optionStats
+            optionBreakdown
         };
     }
 
-
-    static async getTotalCount() {
-        const [rows] = await pool.execute('SELECT COUNT(*) as count FROM survey_responses');
-        return rows[0].count;
-    }
-
     static async getResponsesByOption(option) {
-        const [rows] = await pool.execute(
-            'SELECT * FROM survey_responses WHERE selected_option = ? ORDER BY submitted_at DESC',
+        return await query(
+            `SELECT * FROM survey_responses WHERE selected_option = $1 ORDER BY submitted_at DESC`,
             [option]
         );
-        return rows;
     }
 }
+
 export default SurveyResponse;

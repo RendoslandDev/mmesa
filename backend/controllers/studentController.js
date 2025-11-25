@@ -1,4 +1,4 @@
-// ==================== studentController.js (FIXED) ====================
+// ==================== studentController.js (PostgreSQL FIXED) ====================
 import { query } from '../config/database.js';
 
 export async function getAllStudents(req, res) {
@@ -13,7 +13,7 @@ export async function getAllStudents(req, res) {
 export async function getStudentById(req, res) {
     try {
         const { id } = req.params;
-        const students = await query('SELECT * FROM students WHERE id = ?', [id]);
+        const students = await query('SELECT * FROM students WHERE id = $1', [id]);
 
         if (students.length === 0) {
             return res.status(404).json({ success: false, error: 'Student not found' });
@@ -28,7 +28,7 @@ export async function getStudentById(req, res) {
 export async function getStudentByEmail(req, res) {
     try {
         const { email } = req.params;
-        const students = await query('SELECT * FROM students WHERE email = ?', [email]);
+        const students = await query('SELECT * FROM students WHERE email = $1', [email]);
 
         if (students.length === 0) {
             return res.status(404).json({ success: false, error: 'Student not found' });
@@ -43,7 +43,10 @@ export async function getStudentByEmail(req, res) {
 export async function getStudentsByYear(req, res) {
     try {
         const { year } = req.params;
-        const students = await query('SELECT * FROM students WHERE year_of_study = ? ORDER BY created_at DESC', [year]);
+        const students = await query(
+            'SELECT * FROM students WHERE year_of_study = $1 ORDER BY created_at DESC',
+            [year]
+        );
         res.json({ success: true, data: students, count: students.length });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
