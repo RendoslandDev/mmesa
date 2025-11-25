@@ -31,7 +31,7 @@ export async function submitSurvey(req, res) {
         await connection.beginTransaction();
 
         // Insert or update student safely
-        const [studentResult] = await connection.execute(
+        const [studentResult] = await connection.query(
             `INSERT INTO students (email, index_number, year_of_study, whatsapp_phone)
              VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE whatsapp_phone = ?`,
@@ -39,7 +39,7 @@ export async function submitSurvey(req, res) {
         );
 
         // Retrieve student ID
-        const [studentRows] = await connection.execute(
+        const [studentRows] = await connection.query(
             'SELECT id FROM students WHERE email = ?',
             [email]
         );
@@ -49,7 +49,7 @@ export async function submitSurvey(req, res) {
         const studentId = studentRows[0].id;
 
         // Insert survey response
-        const [responseResult] = await connection.execute(
+        const [responseResult] = await connection.query(
             `INSERT INTO survey_responses (student_id, selected_option, additional_courses, submitted_at)
              VALUES (?, ?, ?, NOW())`,
             [studentId, selectedOption, additionalCourses || null]
@@ -94,6 +94,12 @@ export async function submitSurvey(req, res) {
     } finally {
         if (connection) connection.release(); // release connection back to pool
     }
+
+
+    console.log('Student data:', { email, indexNumber, yearOfStudy, whatsappPhone });
+    console.log('Selected modules:', selectedModules);
+    console.log('Selected software:', selectedSoftware);
+
 }
 
 
