@@ -58,24 +58,121 @@ export async function submitSurvey(req, res) {
         );
         const responseId = responseResult.rows[0].id;
 
-        // Validate module IDs
-        let validModuleIds = [];
+        //         // Validate module IDs
+        //         let validModuleIds = [];
+        //         if (selectedModules.length > 0) {
+        //             const moduleResult = await client.query(
+        //                 `SELECT id FROM modules WHERE id = ANY($1::int[])`,
+        //                 [selectedModules]
+        //             );
+        //             validModuleIds = moduleResult.rows.map(r => r.id);
+        //         }
+        // 
+        //         // Bulk insert valid modules
+        //         for (const mId of validModuleIds) {
+        //             await client.query(
+        //                 `INSERT INTO student_module_selections (student_id, response_id, module_id)
+        //                  VALUES ($1, $2, $3)`,
+        //                 [studentId, responseId, mId]
+        //             );
+        //         }
+
+        // Validate module selection rules
+        //         if (selectedModules.length > 0) {
+        //             // Fetch module details
+        //             const moduleResult = await client.query(
+        //                 `SELECT id, is_major, category FROM modules WHERE id = ANY($1::int[])`,
+        //                 [selectedModules]
+        //             );
+        //             const modules = moduleResult.rows;
+        // 
+        //             // Check major module constraint
+        //             const majorIds = modules.filter(m => m.is_major).map(m => m.id);
+        //             if (majorIds.length > 1) {
+        //                 throw new Error("You can select only one major module");
+        //             }
+        // 
+        //             // Check category constraint
+        //             const categoryCount = {};
+        //             for (const m of modules) {
+        //                 if (!categoryCount[m.category]) categoryCount[m.category] = 0;
+        //                 categoryCount[m.category]++;
+        //                 if (categoryCount[m.category] > 1) {
+        //                     throw new Error(`You cannot select more than one module from category "${m.category}"`);
+        //                 }
+        //             }
+        // 
+        //             // After validation, insert into student_module_selections
+        //             for (const m of modules) {
+        //                 await client.query(
+        //                     `INSERT INTO student_module_selections (student_id, response_id, module_id)
+        //              VALUES ($1, $2, $3)`,
+        //                     [studentId, responseId, m.id]
+        //                 );
+        //             }
+        //         }
+        // Validate module selection rules
         if (selectedModules.length > 0) {
             const moduleResult = await client.query(
-                `SELECT id FROM modules WHERE id = ANY($1::int[])`,
+                `SELECT id, is_major, category, parent_id FROM modules WHERE id = ANY($1::int[])`,
                 [selectedModules]
             );
-            validModuleIds = moduleResult.rows.map(r => r.id);
+
+            const modules = moduleResult.rows;
+
+            // Convert to quick lookup
+            const selectedSet = new Set(selectedModules);
+
+            // Check major module rule
+            const majorIds = modules.filter(m => m.is_major).map(m => m.id);
+            if (majorIds.length > 1) {
+                throw new Error("You can select only one major module");
+            }
+
+            // Check category constraint
+            const categoryCount = {};
+            for (const m of modules) {
+                if (!categoryCount[m.category]) categoryCount[m.category] = 0;
+                categoryCount[m.category]++;
+                if (categoryCount[m.category] > 1) {
+                    throw new Error(`Only one module allowed in category: ${m.category}`);
+                }
+            }
+
+            // 🔥 Parent–child module rule
+            for (const m of modules) {
+                if (m.parent_id) {
+                    // This is a submodule
+                    if (selectedSet.has(m.parent_id)) {
+                        throw new Error(`Cannot select submodule ${m.id} and its parent ${m.parent_id}`);
+                    }
+
+                    // Check siblings
+                    const siblings = modules.filter(x => x.parent_id === m.parent_id);
+                    if (siblings.length > 1) {
+                        throw new Error(`Only one submodule allowed under parent ID ${m.parent_id}`);
+                    }
+
+                } else {
+                    // This is a parent module
+                    const children = modules.filter(x => x.parent_id === m.id);
+                    if (children.length > 0) {
+                        throw new Error(`Cannot select module ${m.id} and its submodules`);
+                    }
+                }
+            }
+
+            // Insert valid selections
+            for (const m of modules) {
+                await client.query(
+                    `INSERT INTO student_module_selections (student_id, response_id, module_id)
+             VALUES ($1, $2, $3)`,
+                    [studentId, responseId, m.id]
+                );
+            }
         }
 
-        // Bulk insert valid modules
-        for (const mId of validModuleIds) {
-            await client.query(
-                `INSERT INTO student_module_selections (student_id, response_id, module_id)
-                 VALUES ($1, $2, $3)`,
-                [studentId, responseId, mId]
-            );
-        }
+
 
         // Validate software IDs
         let validSoftwareIds = [];
