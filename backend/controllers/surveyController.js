@@ -32,98 +32,167 @@ export async function getSoftware(req, res) {
 }
 
 
+// export async function submitSurvey(req, res) {
+//     const client = await pool.connect();
+// 
+//     try {
+//         const {
+//             email,
+//             indexNumber,
+//             yearOfStudy,
+//             whatsappPhone,
+//             selectedOption,
+//             selectedModules = [],
+//             selectedSoftware = [],
+//             additionalCourses
+//         } = req.body;
+// 
+//         if (!email || !indexNumber || !yearOfStudy || !selectedOption) {
+//             return res.status(400).json({ success: false, error: 'Missing required fields' });
+//         }
+// 
+//         await client.query('BEGIN');
+// 
+//         // Upsert student
+//         const studentResult = await client.query(
+//             `
+//             INSERT INTO students (email, index_number, year_of_study, whatsapp_phone)
+//             VALUES ($1, $2, $3, $4)
+//             ON CONFLICT (email)
+//             DO UPDATE SET whatsapp_phone = EXCLUDED.whatsapp_phone
+//             RETURNING id
+//             `,
+//             [email, indexNumber, yearOfStudy, whatsappPhone]
+//         );
+//         const studentId = studentResult.rows[0].id;
+// 
+//         // Insert survey response
+//         const responseResult = await client.query(
+//             `
+//             INSERT INTO survey_responses (student_id, selected_option, additional_courses, submitted_at)
+//             VALUES ($1, $2, $3, NOW())
+//             RETURNING id
+//             `,
+//             [studentId, selectedOption, additionalCourses || null]
+//         );
+//         const responseId = responseResult.rows[0].id;
+// 
+//         // ✅ Validate modules
+//         const validModuleIds = await getValidModuleIds();
+//         const filteredModules = selectedModules.filter(id => validModuleIds.includes(id));
+// 
+//         if (filteredModules.length !== selectedModules.length) {
+//             return res.status(400).json({ success: false, error: 'Some selected modules are invalid' });
+//         }
+// 
+//         // Insert validated modules
+//         if (filteredModules.length > 0) {
+//             const moduleValues = filteredModules
+//                 .map(id => `(${studentId}, ${id}, ${responseId})`)
+//                 .join(',');
+//             await client.query(
+//                 `INSERT INTO student_module_selections (student_id, module_id, response_id) VALUES ${moduleValues}`
+//             );
+//         }
+// 
+//         // ✅ Validate software
+//         const validSoftwareIds = await getValidSoftwareIds();
+//         const filteredSoftware = selectedSoftware.filter(id => validSoftwareIds.includes(id));
+// 
+//         if (filteredSoftware.length !== selectedSoftware.length) {
+//             return res.status(400).json({ success: false, error: 'Some selected software are invalid' });
+//         }
+// 
+//         // Insert validated software
+//         if (filteredSoftware.length > 0) {
+//             const softwareValues = filteredSoftware
+//                 .map(id => `(${studentId}, ${id}, ${responseId})`)
+//                 .join(',');
+//             await client.query(
+//                 `INSERT INTO student_software_selections (student_id, software_id, response_id) VALUES ${softwareValues}`
+//             );
+//         }
+// 
+//         await client.query('COMMIT');
+// 
+//         res.json({ success: true, message: 'Survey submitted successfully', responseId });
+//     } catch (error) {
+//         await client.query('ROLLBACK');
+//         console.error('Survey submission error:', error);
+//         res.status(500).json({ success: false, error: error.message });
+//     } finally {
+//         client.release();
+//     }
+// }
 export async function submitSurvey(req, res) {
     const client = await pool.connect();
 
     try {
-        const {
-            email,
-            indexNumber,
-            yearOfStudy,
-            whatsappPhone,
-            selectedOption,
-            selectedModules = [],
-            selectedSoftware = [],
-            additionalCourses
-        } = req.body;
-
-        if (!email || !indexNumber || !yearOfStudy || !selectedOption) {
-            return res.status(400).json({ success: false, error: 'Missing required fields' });
-        }
+        const { email, indexNumber, yearOfStudy, whatsappPhone, selectedOption, selectedModules, selectedSoftware, additionalCourses } = req.body;
 
         await client.query('BEGIN');
 
-        // Upsert student
-        const studentResult = await client.query(
-            `
-            INSERT INTO students (email, index_number, year_of_study, whatsapp_phone)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (email)
-            DO UPDATE SET whatsapp_phone = EXCLUDED.whatsapp_phone
-            RETURNING id
-            `,
-            [email, indexNumber, yearOfStudy, whatsappPhone]
+        // Find the student
+        const studentResult = await client.query('SELECT id FROM students WHERE email = $1 OR index_number = $2', [email, indexNumber]);
+        const student = studentResult.rows[0];
+
+        if (!student) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, error: 'Student not found' });
+        }
+
+        // Check if survey already submitted
+        const existing = await client.query(
+            'SELECT id FROM survey_responses WHERE student_id = $1',
+            [student.id]
         );
-        const studentId = studentResult.rows[0].id;
+
+        if (existing.rows.length > 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, error: 'Survey already submitted' });
+        }
 
         // Insert survey response
         const responseResult = await client.query(
-            `
-            INSERT INTO survey_responses (student_id, selected_option, additional_courses, submitted_at)
-            VALUES ($1, $2, $3, NOW())
-            RETURNING id
-            `,
-            [studentId, selectedOption, additionalCourses || null]
+            `INSERT INTO survey_responses
+             (student_id, selected_option, additional_courses)
+             VALUES ($1, $2, $3)
+             RETURNING id`,
+            [student.id, selectedOption, additionalCourses]
         );
-        const responseId = responseResult.rows[0].id;
 
-        // ✅ Validate modules
-        const validModuleIds = await getValidModuleIds();
-        const filteredModules = selectedModules.filter(id => validModuleIds.includes(id));
+        const surveyResponseId = responseResult.rows[0].id;
 
-        if (filteredModules.length !== selectedModules.length) {
-            return res.status(400).json({ success: false, error: 'Some selected modules are invalid' });
-        }
-
-        // Insert validated modules
-        if (filteredModules.length > 0) {
-            const moduleValues = filteredModules
-                .map(id => `(${studentId}, ${id}, ${responseId})`)
-                .join(',');
+        // Insert module selections
+        for (const moduleId of selectedModules) {
             await client.query(
-                `INSERT INTO student_module_selections (student_id, module_id, response_id) VALUES ${moduleValues}`
+                `INSERT INTO student_module_selections (student_id, module_id, survey_response_id)
+                 VALUES ($1, $2, $3)`,
+                [student.id, moduleId, surveyResponseId]
             );
         }
 
-        // ✅ Validate software
-        const validSoftwareIds = await getValidSoftwareIds();
-        const filteredSoftware = selectedSoftware.filter(id => validSoftwareIds.includes(id));
-
-        if (filteredSoftware.length !== selectedSoftware.length) {
-            return res.status(400).json({ success: false, error: 'Some selected software are invalid' });
-        }
-
-        // Insert validated software
-        if (filteredSoftware.length > 0) {
-            const softwareValues = filteredSoftware
-                .map(id => `(${studentId}, ${id}, ${responseId})`)
-                .join(',');
+        // Insert software selections
+        for (const softwareId of selectedSoftware) {
             await client.query(
-                `INSERT INTO student_software_selections (student_id, software_id, response_id) VALUES ${softwareValues}`
+                `INSERT INTO student_software_selections (student_id, software_id, survey_response_id)
+                 VALUES ($1, $2, $3)`,
+                [student.id, softwareId, surveyResponseId]
             );
         }
 
         await client.query('COMMIT');
+        return res.json({ success: true });
 
-        res.json({ success: true, message: 'Survey submitted successfully', responseId });
-    } catch (error) {
+    } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Survey submission error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        console.error('Submission error:', err);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
     } finally {
         client.release();
     }
 }
+
 
 
 

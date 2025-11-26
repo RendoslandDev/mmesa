@@ -140,33 +140,6 @@ export async function getAdminStats(req, res) {
         res.status(500).json({ success: false, error: error.message });
     }
 }
-
-// export async function exportToCSV(req, res) {
-//     try {
-//         const results = await query(
-//             `SELECT sr.id, s.email, s.index_number, s.year_of_study, s.whatsapp_phone, 
-//                     sr.selected_option, sr.submitted_at
-//              FROM survey_responses sr
-//              JOIN students s ON sr.student_id = s.id
-//              ORDER BY sr.submitted_at DESC`
-//         );
-// 
-//         let csv = 'ID,Email,Index Number,Year of Study,WhatsApp Phone,Selected Option,Submitted At\n';
-// 
-//         results.forEach(row => {
-//             const submittedAt = row.submitted_at.toISOString(); // convert timestamp to ISO string
-//             csv += `${row.id},"${row.email}","${row.index_number}","${row.year_of_study}","${row.whatsapp_phone}","${row.selected_option}","${submittedAt}"\n`;
-//         });
-// 
-//         res.setHeader('Content-Type', 'text/csv');
-//         res.setHeader('Content-Disposition', 'attachment; filename=survey_responses.csv');
-//         res.send(csv);
-// 
-//     } catch (error) {
-//         console.error('CSV export error:', error);
-//         res.status(500).json({ success: false, error: error.message });
-//     }
-// }
 export async function exportToCSV(req, res) {
     try {
         const results = await query(`
