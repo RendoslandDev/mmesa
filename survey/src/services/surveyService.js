@@ -28,5 +28,11 @@ export const surveyService = {
         const query = params.toString() ? `?${params.toString()}` : '';
         return await apiCall(`/surveys/report${query}`);
     },
+    getAllModules: async () => {
+        return await apiCall('/surveys/modules');
+    },
+    getAllSoftware: async () => {
+        return await apiCall('/surveys/software');
+    },
 };
 export default surveyService;

@@ -1,4 +1,36 @@
-import { pool } from '../config/database.js';
+import { pool, query } from '../config/database.js';
+
+import { getValidModuleIds, getValidSoftwareIds } from '../utils/validationHelpers.js';
+
+
+export async function getModules(req, res) {
+    try {
+        const result = await pool.query(`
+            SELECT id, name, is_major, parent_id
+            FROM modules
+            ORDER BY id
+        `);
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        console.error('Get modules error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+}
+
+export async function getSoftware(req, res) {
+    try {
+        const result = await pool.query(`
+            SELECT id, name
+            FROM software
+            ORDER BY id
+        `);
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        console.error('Get software error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+}
+
 
 export async function submitSurvey(req, res) {
     const client = await pool.connect();
@@ -45,20 +77,36 @@ export async function submitSurvey(req, res) {
         );
         const responseId = responseResult.rows[0].id;
 
-        // Bulk insert module selections
-        if (selectedModules.length > 0) {
-            const moduleValues = selectedModules
-                .map((mId) => `(${studentId}, ${mId}, ${responseId})`)
+        // ✅ Validate modules
+        const validModuleIds = await getValidModuleIds();
+        const filteredModules = selectedModules.filter(id => validModuleIds.includes(id));
+
+        if (filteredModules.length !== selectedModules.length) {
+            return res.status(400).json({ success: false, error: 'Some selected modules are invalid' });
+        }
+
+        // Insert validated modules
+        if (filteredModules.length > 0) {
+            const moduleValues = filteredModules
+                .map(id => `(${studentId}, ${id}, ${responseId})`)
                 .join(',');
             await client.query(
                 `INSERT INTO student_module_selections (student_id, module_id, response_id) VALUES ${moduleValues}`
             );
         }
 
-        // Bulk insert software selections
-        if (selectedSoftware.length > 0) {
-            const softwareValues = selectedSoftware
-                .map((sId) => `(${studentId}, ${sId}, ${responseId})`)
+        // ✅ Validate software
+        const validSoftwareIds = await getValidSoftwareIds();
+        const filteredSoftware = selectedSoftware.filter(id => validSoftwareIds.includes(id));
+
+        if (filteredSoftware.length !== selectedSoftware.length) {
+            return res.status(400).json({ success: false, error: 'Some selected software are invalid' });
+        }
+
+        // Insert validated software
+        if (filteredSoftware.length > 0) {
+            const softwareValues = filteredSoftware
+                .map(id => `(${studentId}, ${id}, ${responseId})`)
                 .join(',');
             await client.query(
                 `INSERT INTO student_software_selections (student_id, software_id, response_id) VALUES ${softwareValues}`
@@ -76,6 +124,7 @@ export async function submitSurvey(req, res) {
         client.release();
     }
 }
+
 
 
 export async function getResults(req, res) {

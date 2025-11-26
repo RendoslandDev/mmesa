@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Check, ArrowRight } from 'lucide-react';
 import ProgressBar from '../componnents/ProgressBar';
 import moduleCategories from '../data/data.js';
+
+import { apiCall } from '../services/api';
 
 const ModuleSelectionPage = ({
     selectedOption,
@@ -11,10 +13,49 @@ const ModuleSelectionPage = ({
     getOptionRules,
     countSelections
 }) => {
+    const [moduleCategories, setModuleCategories] = useState({});
+    const [softwareList, setSoftwareList] = useState([]);
+    const [loading, setLoading] = useState(true);
     const rules = getOptionRules();
     const counts = countSelections();
+    useEffect(() => {
+        async function loadData() {
+            try {
+                // Fetch modules
+                const resModules = await apiCall('/surveys/modules');
+                if (resModules.success) {
+                    const categories = {};
+                    resModules.data.forEach(mod => {
+                        if (!mod.parent_id) {
+                            categories[mod.id] = { major: mod, subModules: [] };
+                        } else {
+                            const parent = Object.values(categories).find(c => c.major.id === mod.parent_id);
+                            if (parent) parent.subModules.push(mod);
+                        }
+                    });
+                    setModuleCategories(categories);
+                } else {
+                    console.error('Failed to load modules:', resModules.error);
+                }
 
-    //     // };
+                // Fetch software
+                const resSoftware = await fetchData('/surveys/software');
+                if (resSoftware.success) {
+                    setSoftwareList(resSoftware.data);
+                } else {
+                    console.error('Failed to load software:', resSoftware.error);
+                }
+            } catch (err) {
+                console.error('Error fetching data:', err);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        loadData();
+    }, []);
+
+
     const handleModuleToggle = (moduleObj, isMajor) => {
         const exists = selectedModules.find(m => m.id === moduleObj.id);
 
@@ -80,6 +121,7 @@ const ModuleSelectionPage = ({
         return selectedModules.some(m => m.id === sub.parentId);
     };
 
+    if (loading) return <p>Loading modules & software...</p>;
 
     return (
         <div>
