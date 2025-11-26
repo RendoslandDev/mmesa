@@ -64,7 +64,7 @@
 }
 
 
-@media (prefers-color-scheme: dark) {
+/* @media (prefers-color-scheme: dark) {
     :root {
         --background-primary: #05070f;
         --background-secondary: #0e101e;
@@ -111,7 +111,7 @@
 
         --text-selection: '';
     }
-}
+} */
 
 * {
     /* margin: 0; */
