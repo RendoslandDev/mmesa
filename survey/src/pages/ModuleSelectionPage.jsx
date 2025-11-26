@@ -14,6 +14,7 @@ const ModuleSelectionPage = ({
     const rules = getOptionRules();
     const counts = countSelections();
 
+    //     // };
     const handleModuleToggle = (moduleObj, isMajor) => {
         const exists = selectedModules.find(m => m.id === moduleObj.id);
 
@@ -22,17 +23,63 @@ const ModuleSelectionPage = ({
             return;
         }
 
-        if (isMajor && counts.majorCount >= rules.majors) {
-            alert(`You can only select ${rules.majors} major module(s)`);
-            return;
+        // Option-specific rules
+        if (selectedOption === "Option 1") {
+            if (!isMajor) {
+                alert("Option 1 allows only major modules");
+                return;
+            }
+            if (counts.majorCount >= rules.majors) {
+                alert(`You can only select ${rules.majors} major module(s)`);
+                return;
+            }
         }
-        if (!isMajor && counts.subModuleCount >= rules.subModules) {
-            alert(`You can only select ${rules.subModules} sub-module(s)`);
-            return;
+
+        if (selectedOption === "Option 2") {
+            if (isMajor) {
+                if (counts.majorCount >= rules.majors) {
+                    alert(`You can only select ${rules.majors} major module(s)`);
+                    return;
+                }
+            } else {
+                // Only block submodule if **its parent major is selected**
+                const parentSelected = selectedModules.some(m => m.id === moduleObj.parentId);
+                if (parentSelected) {
+                    alert("Cannot select submodules under a selected major");
+                    return;
+                }
+                if (counts.subModuleCount >= rules.subModules) {
+                    alert(`You can only select ${rules.subModules} sub-module(s)`);
+                    return;
+                }
+            }
+        }
+
+        if (selectedOption === "Option 3") {
+            if (isMajor) {
+                alert('Option 3 allows only submodules');
+                return;
+            }
+            if (counts.subModuleCount >= 4) {
+                alert('Option 3 allows selecting up to 4 submodules only');
+                return;
+            }
         }
 
         setSelectedModules([...selectedModules, moduleObj]);
     };
+
+    // Disable logic
+    const isMajorDisabled = (category) => {
+        // major is disabled if **any of its submodules is selected**
+        return selectedModules.some(m => m.parentId === category.major.id);
+    };
+
+    const isSubDisabled = (category, sub) => {
+        // submodule is disabled only if its **parent major is selected**
+        return selectedModules.some(m => m.id === sub.parentId);
+    };
+
 
     return (
         <div>
@@ -65,14 +112,26 @@ const ModuleSelectionPage = ({
 
                             <div className="space-y-2 grid grid-cols-1 grid-rows-auto md:grid-cols-2 gap-2">
                                 {rules.majors > 0 && (
+                                    // <button
+                                    //     key={category.major.id}
+                                    //     onClick={() => handleModuleToggle(category.major, true)}
+                                    //     className={`w-full p-4 text-left border-2 rounded-2xl transition ${selectedModules.find(m => m.id === category.major.id)
+                                    //         ? 'border-black bg-black text-white'
+                                    //         : 'border-gray-200 hover:border-gray-400'
+                                    //         }`}
+                                    // >
                                     <button
                                         key={category.major.id}
+                                        disabled={isMajorDisabled(category)}
                                         onClick={() => handleModuleToggle(category.major, true)}
-                                        className={`w-full p-4 text-left border-2 rounded-2xl transition ${selectedModules.find(m => m.id === category.major.id)
-                                            ? 'border-black bg-black text-white'
-                                            : 'border-gray-200 hover:border-gray-400'
+                                        className={`w-full p-4 text-left border-2 rounded-2xl transition
+        ${isMajorDisabled(category) ? 'opacity-40 cursor-not-allowed' : ''}
+        ${selectedModules.some(m => m.id === category.major.id)
+                                                ? 'border-black bg-black text-white'
+                                                : 'border-gray-200 hover:border-gray-400'
                                             }`}
                                     >
+
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
                                                 <p className="font-semibold leading-snug">{category.major.name}</p>
@@ -94,14 +153,26 @@ const ModuleSelectionPage = ({
                                 )}
 
                                 {category.subModules.map(subModule => (
+                                    // <button
+                                    //     key={subModule.id}
+                                    //     onClick={() => handleModuleToggle(subModule, false)}
+                                    //     className={`w-full p-4 text-left border-2 rounded-2xl transition ${selectedModules.find(m => m.id === subModule.id)
+                                    //         ? 'border-black bg-gray-50'
+                                    //         : 'border-gray-200 hover:border-gray-400'
+                                    //         }`}
+                                    // >
                                     <button
                                         key={subModule.id}
+                                        disabled={isSubDisabled(category, subModule)}
                                         onClick={() => handleModuleToggle(subModule, false)}
-                                        className={`w-full p-4 text-left border-2 rounded-2xl transition ${selectedModules.find(m => m.id === subModule.id)
-                                            ? 'border-black bg-gray-50'
-                                            : 'border-gray-200 hover:border-gray-400'
+                                        className={`w-full p-4 text-left border-2 rounded-2xl transition
+        ${isSubDisabled(category, subModule) ? 'opacity-40 cursor-not-allowed' : ''}
+        ${selectedModules.some(m => m.id === subModule.id)
+                                                ? 'border-black bg-gray-50'
+                                                : 'border-gray-200 hover:border-gray-400'
                                             }`}
                                     >
+
                                         <div className="flex items-start justify-between gap-3">
                                             <p className="flex-1 leading-snug">{subModule.name}</p>
                                             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${selectedModules.find(m => m.id === subModule.id)
