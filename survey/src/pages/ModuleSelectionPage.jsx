@@ -14,37 +14,32 @@ const ModuleSelectionPage = ({
     const [moduleCategories, setModuleCategories] = useState({});
     const [loading, setLoading] = useState(true);
 
-    // ----------------------------------------------
-    // FIX 1: computeCounts moved BEFORE usage
-    // ----------------------------------------------
+    // -------------------------------------------------
+    // FIXED: Correct Counting
+    // -------------------------------------------------
     const computeCounts = () => {
-        try {
-            const c = countSelections();
-            return (
-                c || {
-                    majorCount: 0,
-                    subModuleCount: 0,
-                    softwareCount: 0,
-                    total: 0
-                }
-            );
-        } catch {
-            const majorCount = selectedModules.filter(
-                (m) => m.is_major || m.isMajor
-            ).length;
-            const subModuleCount = selectedModules.length - majorCount;
-            return {
-                majorCount,
-                subModuleCount,
-                softwareCount: 0,
-                total: majorCount + subModuleCount
-            };
-        }
+        let majorCount = 0;
+        let subModuleCount = 0;
+
+        selectedModules.forEach((m) => {
+            if (m.isMajor) majorCount++;
+            else subModuleCount++;
+        });
+
+        return {
+            majorCount,
+            subModuleCount,
+            softwareCount: 0,
+            total: majorCount + subModuleCount
+        };
     };
 
     const rules = getOptionRules();
-    const counts = computeCounts(); // FIX 2: use counts, not currentCounts
+    const counts = computeCounts();
 
+    // -------------------------------------------------
+    // LOAD MODULES FROM BACKEND
+    // -------------------------------------------------
     useEffect(() => {
         async function loadData() {
             try {
@@ -52,15 +47,21 @@ const ModuleSelectionPage = ({
 
                 if (resModules.success) {
                     const categories = {};
+
                     resModules.data.forEach((mod) => {
                         mod.parentId = mod.parent_id;
 
+                        // FIX: Define module type
+                        mod.isMajor = !mod.parent_id;
+                        mod.isSub = !!mod.parent_id;
+
                         if (!mod.parent_id) {
-                            categories[mod.id] = { major: mod, subModules: [] };
+                            categories[mod.id] = {
+                                major: mod,
+                                subModules: []
+                            };
                         } else {
-                            const parent = Object.values(categories).find(
-                                (c) => c.major.id === mod.parent_id
-                            );
+                            const parent = categories[mod.parent_id];
                             if (parent) parent.subModules.push(mod);
                         }
                     });
@@ -79,35 +80,37 @@ const ModuleSelectionPage = ({
         loadData();
     }, []);
 
-    // ----------------------------------------------
-    // MODULE TOGGLE HANDLER
-    // ----------------------------------------------
+    // -------------------------------------------------
+    // HANDLE MODULE TOGGLE
+    // -------------------------------------------------
     const handleModuleToggle = (moduleObj, isMajor) => {
         const exists = selectedModules.find((m) => m.id === moduleObj.id);
-        const rules = getOptionRules();
         const counts = computeCounts();
 
+        // REMOVE if already selected
         if (exists) {
             setSelectedModules(selectedModules.filter((m) => m.id !== moduleObj.id));
             return;
         }
 
-        // --- Option-specific logic ---
+
+        // === Option 1 ===
         if (selectedOption === "Option 1") {
             if (!isMajor) {
-                alert("Option 1 allows only major modules");
+                alert("Option 1 allows only major modules.");
                 return;
             }
             if (counts.majorCount >= rules.majors) {
-                alert(`You can only select ${rules.majors} major module(s)`);
+                alert(`You can select only ${rules.majors} major module(s).`);
                 return;
             }
         }
 
+        // === Option 2 ===
         if (selectedOption === "Option 2") {
             if (isMajor) {
                 if (counts.majorCount >= rules.majors) {
-                    alert(`You can only select ${rules.majors} major module(s)`);
+                    alert(`You can select only ${rules.majors} major module(s).`);
                     return;
                 }
             } else {
@@ -115,39 +118,46 @@ const ModuleSelectionPage = ({
                     (m) => m.id === moduleObj.parentId
                 );
                 if (parentSelected) {
-                    alert("Cannot select submodules under a selected major");
+                    alert("Cannot select submodules under a selected major.");
                     return;
                 }
                 if (counts.subModuleCount >= rules.subModules) {
-                    alert(`You can only select ${rules.subModules} sub-module(s)`);
+                    alert(
+                        `You can select only ${rules.subModules} sub-module(s).`
+                    );
                     return;
                 }
             }
         }
 
+        // === Option 3 ===
         if (selectedOption === "Option 3") {
             if (isMajor) {
-                alert("Option 3 allows only submodules");
+                alert("Option 3 allows only submodules.");
                 return;
             }
             if (counts.subModuleCount >= 4) {
-                alert("Option 3 allows selecting up to 4 submodules only");
+                alert("Option 3 allows selecting up to 4 submodules only.");
                 return;
             }
         }
 
-        // --- Parent-child blocking ---
+        // -------------------------------------------------------------
+        // PARENT/CHILD SELECTION BLOCKING (major ↔ sub rules)
+        // -------------------------------------------------------------
         if (moduleObj.parentId) {
+            // Selecting submodule
             if (selectedModules.some((m) => m.id === moduleObj.parentId)) {
-                alert("Cannot select a submodule while its parent major is selected");
+                alert("Cannot select a submodule while its major is selected.");
                 return;
             }
         } else {
+            // Selecting major
             const childrenSelected = selectedModules.some(
                 (m) => m.parentId === moduleObj.id
             );
             if (childrenSelected) {
-                alert("Cannot select a major while its submodule(s) are selected");
+                alert("Cannot select a major while its submodule(s) are selected.");
                 return;
             }
         }
@@ -155,18 +165,16 @@ const ModuleSelectionPage = ({
         setSelectedModules([...selectedModules, moduleObj]);
     };
 
-    // Disable buttons
-    const isMajorDisabled = (category) => {
-        return selectedModules.some((m) => m.parentId === category.major.id);
-    };
+    // Disable states
+    const isMajorDisabled = (category) =>
+        selectedModules.some((m) => m.parentId === category.major.id);
 
-    const isSubDisabled = (category, sub) => {
-        return selectedModules.some((m) => m.id === sub.parentId);
-    };
+    const isSubDisabled = (category, sub) =>
+        selectedModules.some((m) => m.id === sub.parentId);
 
-    // ----------------------------------------------
+    // -------------------------------------------------
     // UI
-    // ----------------------------------------------
+    // -------------------------------------------------
     return (
         <div>
             {/* TOP BAR */}
@@ -194,10 +202,8 @@ const ModuleSelectionPage = ({
                             <h3 className="font-bold text-lg mb-3 px-2">{catName}</h3>
 
                             <div className="space-y-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-
-                                {/* MAJOR BUTTON */}
+                                {/* MAJOR MODULE */}
                                 <button
-                                    key={category.major.id}
                                     disabled={isMajorDisabled(category)}
                                     onClick={() =>
                                         handleModuleToggle(category.major, true)
@@ -206,9 +212,7 @@ const ModuleSelectionPage = ({
                                         ${isMajorDisabled(category)
                                             ? "opacity-40 cursor-not-allowed"
                                             : ""}
-                                        ${selectedModules.some(
-                                                (m) => m.id === category.major.id
-                                            )
+                                        ${isMajorSelected
                                             ? "border-black bg-black text-white"
                                             : "border-gray-200 hover:border-gray-400"
                                         }`}
@@ -219,9 +223,7 @@ const ModuleSelectionPage = ({
                                                 {category.major.name}
                                             </p>
                                             <span
-                                                className={`inline-block mt-2 px-2 py-0.5 text-xs font-bold rounded-full ${selectedModules.some(
-                                                    (m) => m.id === category.major.id
-                                                )
+                                                className={`inline-block mt-2 px-2 py-0.5 text-xs font-bold rounded-full ${isMajorSelected
                                                     ? "bg-white/20 text-white"
                                                     : "bg-yellow-100 text-yellow-800"
                                                     }`}
@@ -230,9 +232,7 @@ const ModuleSelectionPage = ({
                                             </span>
                                         </div>
                                         <div
-                                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${selectedModules.some(
-                                                (m) => m.id === category.major.id
-                                            )
+                                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${isMajorSelected
                                                 ? "border-white bg-white"
                                                 : "border-gray-300"
                                                 }`}
@@ -245,55 +245,51 @@ const ModuleSelectionPage = ({
                                 </button>
 
                                 {/* SUBMODULES */}
-                                {category.subModules.map((sub) => (
-                                    <button
-                                        key={sub.id}
-                                        disabled={isSubDisabled(category, sub)}
-                                        onClick={() =>
-                                            handleModuleToggle(sub, false)
-                                        }
-                                        className={`w-full p-4 text-left border-2 rounded-2xl transition
-                                            ${isSubDisabled(category, sub)
-                                                ? "opacity-40 cursor-not-allowed"
-                                                : ""}
-                                            ${selectedModules.some(
-                                                    (m) => m.id === sub.id
-                                                )
-                                                ? "border-black bg-gray-50"
-                                                : "border-gray-200 hover:border-gray-400"
-                                            }`}
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <p className="flex-1 leading-snug">
-                                                {sub.name}
-                                            </p>
-                                            <div
-                                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${selectedModules.some(
-                                                    (m) => m.id === sub.id
-                                                )
-                                                    ? "border-black bg-black"
-                                                    : "border-gray-300"
-                                                    }`}
-                                            >
-                                                {selectedModules.some(
-                                                    (m) => m.id === sub.id
-                                                ) && (
+                                {category.subModules.map((sub) => {
+                                    const isSelected = selectedModules.some(
+                                        (m) => m.id === sub.id
+                                    );
+
+                                    return (
+                                        <button
+                                            key={sub.id}
+                                            disabled={isSubDisabled(category, sub)}
+                                            onClick={() => handleModuleToggle(sub, false)}
+                                            className={`w-full p-4 text-left border-2 rounded-2xl transition
+                                                ${isSubDisabled(category, sub)
+                                                    ? "opacity-40 cursor-not-allowed"
+                                                    : ""}
+                                                ${isSelected
+                                                    ? "border-black bg-gray-50"
+                                                    : "border-gray-200 hover:border-gray-400"
+                                                }`}
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <p className="flex-1">{sub.name}</p>
+                                                <div
+                                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected
+                                                        ? "border-black bg-black"
+                                                        : "border-gray-300"
+                                                        }`}
+                                                >
+                                                    {isSelected && (
                                                         <Check
                                                             className="text-white"
                                                             size={14}
                                                         />
                                                     )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    </button>
-                                ))}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                     );
                 })}
             </div>
 
-            {/* NAV BAR */}
+            {/* NAVIGATION */}
             <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-4 flex gap-3">
                 <button
                     onClick={() => onNavigate("option-selection")}
