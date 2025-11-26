@@ -6,8 +6,8 @@ dotenv.config();
 
 async function createOrUpdateAdmin() {
     try {
-        const username = process.env.ADMIN_USERNAME || 'admin';
-        const password = process.env.ADMIN_PASSWORD || 'admin123';
+        const username = process.env.ADMIN_USERNAME || 'mmesa_admin';
+        const password = process.env.ADMIN_PASSWORD || 'mmesa_admin_pass';
         const role = 'admin';
 
         const hashedPassword = await bcrypt.hash(password, 10);
