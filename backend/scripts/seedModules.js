@@ -55,20 +55,20 @@ async function seedDatabase() {
         }
 
         // ✅ Add sample students
-        console.log('📦 Seeding sample students...');
-
-        const sampleStudents = [
-            { email: 'agyapongrendosland53@gmail.com', index_number: '9209233049', year_of_study: 2, whatsapp_phone: '0292399334' },
-            { email: 'student2@example.com', index_number: 'STU002', year_of_study: 1, whatsapp_phone: '0290000002' },
-            { email: 'student3@example.com', index_number: 'STU003', year_of_study: 3, whatsapp_phone: '0290000003' },
-        ];
-
-        for (const student of sampleStudents) {
-            await client.query(
-                `INSERT INTO students (email, index_number, year_of_study, whatsapp_phone) VALUES ($1, $2, $3, $4)`,
-                [student.email, student.index_number, student.year_of_study, student.whatsapp_phone]
-            );
-        }
+        //         console.log('📦 Seeding sample students...');
+        // 
+        //         const sampleStudents = [
+        //             { email: 'agyapongrendosland53@gmail.com', index_number: '9209233049', year_of_study: 2, whatsapp_phone: '0292399334' },
+        //             { email: 'student2@example.com', index_number: 'STU002', year_of_study: 1, whatsapp_phone: '0290000002' },
+        //             { email: 'student3@example.com', index_number: 'STU003', year_of_study: 3, whatsapp_phone: '0290000003' },
+        //         ];
+        // 
+        //         for (const student of sampleStudents) {
+        //             await client.query(
+        //                 `INSERT INTO students (email, index_number, year_of_study, whatsapp_phone) VALUES ($1, $2, $3, $4)`,
+        //                 [student.email, student.index_number, student.year_of_study, student.whatsapp_phone]
+        //             );
+        //         }
 
         console.log('🎓 Sample students added.');
         console.log('🎉 Database fully reset and modules seeded. Ready for new surveys!');
