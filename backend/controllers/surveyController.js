@@ -32,166 +32,99 @@ export async function getSoftware(req, res) {
 }
 
 
-// export async function submitSurvey(req, res) {
-//     const client = await pool.connect();
-// 
-//     try {
-//         const {
-//             email,
-//             indexNumber,
-//             yearOfStudy,
-//             whatsappPhone,
-//             selectedOption,
-//             selectedModules = [],
-//             selectedSoftware = [],
-//             additionalCourses
-//         } = req.body;
-// 
-//         if (!email || !indexNumber || !yearOfStudy || !selectedOption) {
-//             return res.status(400).json({ success: false, error: 'Missing required fields' });
-//         }
-// 
-//         await client.query('BEGIN');
-// 
-//         // Upsert student
-//         const studentResult = await client.query(
-//             `
-//             INSERT INTO students (email, index_number, year_of_study, whatsapp_phone)
-//             VALUES ($1, $2, $3, $4)
-//             ON CONFLICT (email)
-//             DO UPDATE SET whatsapp_phone = EXCLUDED.whatsapp_phone
-//             RETURNING id
-//             `,
-//             [email, indexNumber, yearOfStudy, whatsappPhone]
-//         );
-//         const studentId = studentResult.rows[0].id;
-// 
-//         // Insert survey response
-//         const responseResult = await client.query(
-//             `
-//             INSERT INTO survey_responses (student_id, selected_option, additional_courses, submitted_at)
-//             VALUES ($1, $2, $3, NOW())
-//             RETURNING id
-//             `,
-//             [studentId, selectedOption, additionalCourses || null]
-//         );
-//         const responseId = responseResult.rows[0].id;
-// 
-//         // ✅ Validate modules
-//         const validModuleIds = await getValidModuleIds();
-//         const filteredModules = selectedModules.filter(id => validModuleIds.includes(id));
-// 
-//         if (filteredModules.length !== selectedModules.length) {
-//             return res.status(400).json({ success: false, error: 'Some selected modules are invalid' });
-//         }
-// 
-//         // Insert validated modules
-//         if (filteredModules.length > 0) {
-//             const moduleValues = filteredModules
-//                 .map(id => `(${studentId}, ${id}, ${responseId})`)
-//                 .join(',');
-//             await client.query(
-//                 `INSERT INTO student_module_selections (student_id, module_id, response_id) VALUES ${moduleValues}`
-//             );
-//         }
-// 
-//         // ✅ Validate software
-//         const validSoftwareIds = await getValidSoftwareIds();
-//         const filteredSoftware = selectedSoftware.filter(id => validSoftwareIds.includes(id));
-// 
-//         if (filteredSoftware.length !== selectedSoftware.length) {
-//             return res.status(400).json({ success: false, error: 'Some selected software are invalid' });
-//         }
-// 
-//         // Insert validated software
-//         if (filteredSoftware.length > 0) {
-//             const softwareValues = filteredSoftware
-//                 .map(id => `(${studentId}, ${id}, ${responseId})`)
-//                 .join(',');
-//             await client.query(
-//                 `INSERT INTO student_software_selections (student_id, software_id, response_id) VALUES ${softwareValues}`
-//             );
-//         }
-// 
-//         await client.query('COMMIT');
-// 
-//         res.json({ success: true, message: 'Survey submitted successfully', responseId });
-//     } catch (error) {
-//         await client.query('ROLLBACK');
-//         console.error('Survey submission error:', error);
-//         res.status(500).json({ success: false, error: error.message });
-//     } finally {
-//         client.release();
-//     }
-// }
+
+
+
 export async function submitSurvey(req, res) {
-    const client = await pool.connect();
+    const connection = await getConnection();
 
     try {
-        const { email, indexNumber, yearOfStudy, whatsappPhone, selectedOption, selectedModules, selectedSoftware, additionalCourses } = req.body;
+        await connection.beginTransaction();
 
-        await client.query('BEGIN');
+        const {
+            email,
+            indexNumber,
+            yearOfStudy,
+            whatsappPhone,
+            selectedOption,
+            selectedModules = [],
+            selectedSoftware = [],
+            additionalCourses
+        } = req.body;
 
-        // Find the student
-        const studentResult = await client.query('SELECT id FROM students WHERE email = $1 OR index_number = $2', [email, indexNumber]);
-        const student = studentResult.rows[0];
-
-        if (!student) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ success: false, error: 'Student not found' });
+        if (!email || !indexNumber) {
+            return res.status(400).json({
+                success: false,
+                error: "Email and index number required"
+            });
         }
 
-        // Check if survey already submitted
-        const existing = await client.query(
-            'SELECT id FROM survey_responses WHERE student_id = $1',
-            [student.id]
+        // 1. Check or create student
+        const [studentRows] = await connection.execute(
+            "SELECT id FROM students WHERE email = ? AND index_number = ? LIMIT 1",
+            [email, indexNumber]
         );
 
-        if (existing.rows.length > 0) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ success: false, error: 'Survey already submitted' });
+        let studentId;
+        if (studentRows.length === 0) {
+            const [insert] = await connection.execute(
+                "INSERT INTO students (email, index_number) VALUES (?, ?)",
+                [email, indexNumber]
+            );
+            studentId = insert.insertId;
+        } else {
+            studentId = studentRows[0].id;
         }
 
-        // Insert survey response
-        const responseResult = await client.query(
-            `INSERT INTO survey_responses
-             (student_id, selected_option, additional_courses)
-             VALUES ($1, $2, $3)
-             RETURNING id`,
-            [student.id, selectedOption, additionalCourses]
+        // 2. Check if already submitted
+        const [existing] = await connection.execute(
+            "SELECT id FROM survey_responses WHERE student_id = ? LIMIT 1",
+            [studentId]
         );
 
-        const surveyResponseId = responseResult.rows[0].id;
-
-        // Insert module selections
-        for (const moduleId of selectedModules) {
-            await client.query(
-                `INSERT INTO student_module_selections (student_id, module_id, survey_response_id)
-                 VALUES ($1, $2, $3)`,
-                [student.id, moduleId, surveyResponseId]
-            );
+        if (existing.length > 0) {
+            await connection.rollback();
+            return res.status(400).json({
+                success: false,
+                error: "You already submitted the survey"
+            });
         }
 
-        // Insert software selections
-        for (const softwareId of selectedSoftware) {
-            await client.query(
-                `INSERT INTO student_software_selections (student_id, software_id, survey_response_id)
-                 VALUES ($1, $2, $3)`,
-                [student.id, softwareId, surveyResponseId]
-            );
-        }
+        // 3. Insert survey response
+        await connection.execute(
+            `INSERT INTO survey_responses 
+            (student_id, year_of_study, whatsapp_phone, selected_option, selected_modules, selected_software, additional_courses)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+                studentId,
+                yearOfStudy,
+                whatsappPhone,
+                selectedOption,
+                JSON.stringify(selectedModules),
+                JSON.stringify(selectedSoftware),
+                additionalCourses || null
+            ]
+        );
 
-        await client.query('COMMIT');
-        return res.json({ success: true });
+        await connection.commit();
 
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('Submission error:', err);
-        return res.status(500).json({ success: false, error: 'Internal server error' });
-    } finally {
-        client.release();
+        return res.status(200).json({
+            success: true,
+            message: "Survey submitted successfully"
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error("Survey submit error:", error);
+        return res.status(500).json({
+            success: false,
+            error: "Server error"
+        });
     }
 }
+
+
+
 
 
 
