@@ -6,15 +6,16 @@ class SurveyResponse {
         try {
             const result = await query(
                 `INSERT INTO survey_responses (student_id, selected_option, additional_courses)
-                 VALUES ($1, $2, $3)
-                 RETURNING id`,
+             VALUES ($1, $2, $3)
+             RETURNING id`,
                 [studentId, selectedOption, additionalCourses]
             );
-            return result[0]?.id;
+            return result.rows[0]?.id;
         } catch (error) {
             throw new Error('Failed to create survey response: ' + error.message);
         }
     }
+
 
     static async findById(responseId) {
         const rows = await query(
@@ -38,28 +39,24 @@ class SurveyResponse {
     }
 
     static async getStatistics() {
-        const optionBreakdown = await query(`
-            SELECT selected_option, COUNT(*) as count
-            FROM survey_responses
-            GROUP BY selected_option
-        `);
+        const optionBreakdownResult = await query(`
+        SELECT selected_option, COUNT(*) as count
+        FROM survey_responses
+        GROUP BY selected_option
+    `);
 
         const totalResponsesResult = await query(`SELECT COUNT(*) as count FROM survey_responses`);
-        const totalResponses = totalResponsesResult[0]?.count || 0;
-
         const totalModuleSelectionsResult = await query(`SELECT COUNT(*) as count FROM student_module_selections`);
-        const totalModuleSelections = totalModuleSelectionsResult[0]?.count || 0;
-
         const totalSoftwareSelectionsResult = await query(`SELECT COUNT(*) as count FROM student_software_selections`);
-        const totalSoftwareSelections = totalSoftwareSelectionsResult[0]?.count || 0;
 
         return {
-            totalResponses,
-            totalModuleSelections,
-            totalSoftwareSelections,
-            optionBreakdown
+            totalResponses: Number(totalResponsesResult.rows[0].count),
+            totalModuleSelections: Number(totalModuleSelectionsResult.rows[0].count),
+            totalSoftwareSelections: Number(totalSoftwareSelectionsResult.rows[0].count),
+            optionBreakdown: optionBreakdownResult.rows
         };
     }
+
 
     static async getResponsesByOption(option) {
         return await query(

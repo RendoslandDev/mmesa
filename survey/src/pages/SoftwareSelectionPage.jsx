@@ -41,9 +41,7 @@ const SoftwareSelectionPage = ({
     const rules = getOptionRules();
     const counts = countSelections();
 
-    // -------------------------------------------------------
-    // SOFTWARE TOGGLE
-    // -------------------------------------------------------
+
     const handleSoftwareToggle = (software) => {
         const exists = selectedSoftware.some((s) => s.id === software.id);
 
@@ -61,21 +59,19 @@ const SoftwareSelectionPage = ({
         setSelectedSoftware([...selectedSoftware, software]);
     };
 
-    // -------------------------------------------------------
-    // SUBMIT
-    // -------------------------------------------------------
+
     const handleSubmit = async () => {
         setError(null);
 
         const countsNow = countSelections();
 
-        // Validate majors
+
         if (countsNow.majorCount !== rules.majors) {
             alert(`You must select exactly ${rules.majors} major module(s).`);
             return;
         }
 
-        // Validate submodule + software combined
+
         const combined = countsNow.subModuleCount + countsNow.softwareCount;
 
         if (combined !== rules.subModules) {
@@ -115,9 +111,6 @@ const SoftwareSelectionPage = ({
         }
     };
 
-    // -------------------------------------------------------
-    // UI
-    // -------------------------------------------------------
     return (
         <div>
             {/* HEADER */}
