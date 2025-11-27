@@ -158,27 +158,26 @@ export async function submitSurvey(req, res) {
 export async function getResults(req, res) {
     try {
         const result = await pool.query(`
-            SELECT sr.id AS survey_id,
-                   sr.selected_option,
-                   sr.additional_courses,
-                   sr.submitted_at,
-                   s.id AS student_id,
-                   s.email,
-                   s.index_number,
-                   s.year_of_study,
-                   s.whatsapp_phone,
-                   COALESCE(json_agg(DISTINCT m.id) FILTER (WHERE m.id IS NOT NULL), '[]') AS selected_module_ids,
-                   COALESCE(json_agg(DISTINCT m.name) FILTER (WHERE m.name IS NOT NULL), '[]') AS selected_module_names,
-                   COALESCE(json_agg(DISTINCT sw.id) FILTER (WHERE sw.id IS NOT NULL), '[]') AS selected_software_ids,
-                   COALESCE(json_agg(DISTINCT sw.name) FILTER (WHERE sw.name IS NOT NULL), '[]') AS selected_software_names
-            FROM survey_responses sr
-            JOIN students s ON sr.student_id = s.id
-            LEFT JOIN student_module_selections sms ON sms.response_id = sr.id
-            LEFT JOIN modules m ON m.id = sms.module_id
-            LEFT JOIN student_software_selections sss ON sss.response_id = sr.id
-            LEFT JOIN software sw ON sw.id = sss.software_id
-            GROUP BY sr.id, s.id
-            ORDER BY sr.submitted_at DESC
+          SELECT sr.id AS survey_id,
+       sr.selected_option,
+       sr.additional_courses,
+       sr.submitted_at,
+       s.id AS student_id,
+       s.email,
+       s.index_number,
+       s.year_of_study,
+       s.whatsapp_phone,
+       COALESCE(json_agg(DISTINCT m.name) FILTER (WHERE m.name IS NOT NULL), '[]') AS selected_modules,
+       COALESCE(json_agg(DISTINCT sw.name) FILTER (WHERE sw.name IS NOT NULL), '[]') AS selected_software
+FROM survey_responses sr
+JOIN students s ON sr.student_id = s.id
+LEFT JOIN student_module_selections sms ON sms.response_id = sr.id
+LEFT JOIN modules m ON m.id = sms.module_id
+LEFT JOIN student_software_selections sss ON sss.response_id = sr.id
+LEFT JOIN software sw ON sw.id = sss.software_id
+GROUP BY sr.id, s.id
+ORDER BY sr.submitted_at DESC;
+
         `);
 
         res.json({
