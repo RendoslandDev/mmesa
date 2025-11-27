@@ -31,7 +31,7 @@ export async function getSoftware(req, res) {
     }
 }
 
-// --------------------------- SUBMIT SURVEY ---------------------------
+
 export async function submitSurvey(req, res) {
     const client = await pool.connect();
 
@@ -41,8 +41,8 @@ export async function submitSurvey(req, res) {
         const {
             email,
             indexNumber,
-            yearOfStudy,
-            whatsappPhone,
+            yearOfStudy,        // optional: store in students
+            whatsappPhone,      // optional: store in students
             selectedOption,
             selectedModules = [],
             selectedSoftware = [],
@@ -66,15 +66,27 @@ export async function submitSurvey(req, res) {
         let studentId;
         if (studentResult.rows.length === 0) {
             const insertStudent = await client.query(
-                "INSERT INTO students (email, index_number) VALUES ($1, $2) RETURNING id",
-                [email, indexNumber]
+                `INSERT INTO students (email, index_number, year_of_study, whatsapp_phone)
+                 VALUES ($1, $2, $3, $4) RETURNING id`,
+                [email, indexNumber, yearOfStudy || null, whatsappPhone || null]
             );
             studentId = insertStudent.rows[0].id;
         } else {
             studentId = studentResult.rows[0].id;
+
+            // Optional: update student info if yearOfStudy or whatsappPhone provided
+            if (yearOfStudy || whatsappPhone) {
+                await client.query(
+                    `UPDATE students SET 
+                        year_of_study = COALESCE($1, year_of_study),
+                        whatsapp_phone = COALESCE($2, whatsapp_phone)
+                     WHERE id = $3`,
+                    [yearOfStudy || null, whatsappPhone || null, studentId]
+                );
+            }
         }
 
-        // 2️⃣ Check if already submitted
+        // 2️⃣ Check if survey already submitted
         const existing = await client.query(
             "SELECT id FROM survey_responses WHERE student_id = $1 LIMIT 1",
             [studentId]
@@ -88,14 +100,39 @@ export async function submitSurvey(req, res) {
             });
         }
 
-        // 3️⃣ Insert survey response
-        await client.query(
+        // 3️⃣ Insert survey response (only allowed columns)
+        const insertSurvey = await client.query(
             `INSERT INTO survey_responses 
-    (student_id, selected_option, additional_courses)
-   VALUES ($1, $2, $3)`,
+                (student_id, selected_option, additional_courses)
+             VALUES ($1, $2, $3) RETURNING id`,
             [studentId, selectedOption, additionalCourses || null]
         );
 
+        const surveyId = insertSurvey.rows[0].id;
+
+        // 4️⃣ Insert selected modules
+        if (selectedModules.length > 0) {
+            const validModuleIds = await getValidModuleIds(selectedModules); // helper function
+            for (const moduleId of validModuleIds) {
+                await client.query(
+                    `INSERT INTO student_module_selections (response_id, module_id)
+                     VALUES ($1, $2)`,
+                    [surveyId, moduleId]
+                );
+            }
+        }
+
+        // 5️⃣ Insert selected software
+        if (selectedSoftware.length > 0) {
+            const validSoftwareIds = await getValidSoftwareIds(selectedSoftware); // helper function
+            for (const softwareId of validSoftwareIds) {
+                await client.query(
+                    `INSERT INTO student_software_selections (response_id, software_id)
+                     VALUES ($1, $2)`,
+                    [surveyId, softwareId]
+                );
+            }
+        }
 
         await client.query('COMMIT');
 
@@ -112,6 +149,7 @@ export async function submitSurvey(req, res) {
         client.release();
     }
 }
+
 
 // --------------------------- GET RESULTS ---------------------------
 export async function getResults(req, res) {
