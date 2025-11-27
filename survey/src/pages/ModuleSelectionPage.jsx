@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Check, ArrowRight } from "lucide-react";
 import ProgressBar from "../componnents/ProgressBar";
 import { apiCall } from "../services/api";
+import localCategories from "../data/data"
 
 const ModuleSelectionPage = ({
     selectedOption,
@@ -63,6 +64,14 @@ const ModuleSelectionPage = ({
                             const parent = categories[mod.parent_id];
                             if (parent) parent.subModules.push(mod);
                         }
+                    });
+
+
+                    Object.values(categories).forEach(cat => {
+                        const local = Object.values(localCategories).find(
+                            l => l.major.id === cat.major.id
+                        );
+                        if (local) cat.text = local.text;
                     });
 
 
@@ -199,7 +208,10 @@ const ModuleSelectionPage = ({
 
                     return (
                         <div key={category.major.id}>
-                            <h3 className="font-bold text-lg mb-3 px-2">{catName}</h3>
+
+                            <p className="card text-sm text-gray-600 px-2 mb-3">
+                                {category.text}
+                            </p>
 
                             <div className="space-y-2 grid grid-cols-1 md:grid-cols-2 gap-2">
                                 {/* MAJOR MODULE */}
