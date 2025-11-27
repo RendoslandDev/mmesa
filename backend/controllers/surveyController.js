@@ -154,12 +154,30 @@ export async function submitSurvey(req, res) {
 
 
 // --------------------------- GET RESULTS ---------------------------
+// --------------------------- GET RESULTS ---------------------------
 export async function getResults(req, res) {
     try {
         const result = await pool.query(`
-            SELECT sr.*, s.email, s.index_number, s.year_of_study, s.whatsapp_phone
+            SELECT sr.id AS survey_id,
+                   sr.selected_option,
+                   sr.additional_courses,
+                   sr.submitted_at,
+                   s.id AS student_id,
+                   s.email,
+                   s.index_number,
+                   s.year_of_study,
+                   s.whatsapp_phone,
+                   COALESCE(json_agg(DISTINCT m.id) FILTER (WHERE m.id IS NOT NULL), '[]') AS selected_module_ids,
+                   COALESCE(json_agg(DISTINCT m.name) FILTER (WHERE m.name IS NOT NULL), '[]') AS selected_module_names,
+                   COALESCE(json_agg(DISTINCT sw.id) FILTER (WHERE sw.id IS NOT NULL), '[]') AS selected_software_ids,
+                   COALESCE(json_agg(DISTINCT sw.name) FILTER (WHERE sw.name IS NOT NULL), '[]') AS selected_software_names
             FROM survey_responses sr
             JOIN students s ON sr.student_id = s.id
+            LEFT JOIN student_module_selections sms ON sms.response_id = sr.id
+            LEFT JOIN modules m ON m.id = sms.module_id
+            LEFT JOIN student_software_selections sss ON sss.response_id = sr.id
+            LEFT JOIN software sw ON sw.id = sss.software_id
+            GROUP BY sr.id, s.id
             ORDER BY sr.submitted_at DESC
         `);
 
@@ -170,6 +188,55 @@ export async function getResults(req, res) {
         });
     } catch (error) {
         console.error('Get results error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+}
+
+// --------------------------- GET REPORT ---------------------------
+export async function getReport(req, res) {
+    try {
+        const { option } = req.query;
+
+        let sql = `
+            SELECT sr.id AS survey_id,
+                   sr.selected_option,
+                   sr.additional_courses,
+                   sr.submitted_at,
+                   s.id AS student_id,
+                   s.email,
+                   s.index_number,
+                   s.year_of_study,
+                   s.whatsapp_phone,
+                   COALESCE(json_agg(DISTINCT m.id) FILTER (WHERE m.id IS NOT NULL), '[]') AS selected_module_ids,
+                   COALESCE(json_agg(DISTINCT m.name) FILTER (WHERE m.name IS NOT NULL), '[]') AS selected_module_names,
+                   COALESCE(json_agg(DISTINCT sw.id) FILTER (WHERE sw.id IS NOT NULL), '[]') AS selected_software_ids,
+                   COALESCE(json_agg(DISTINCT sw.name) FILTER (WHERE sw.name IS NOT NULL), '[]') AS selected_software_names
+            FROM survey_responses sr
+            JOIN students s ON sr.student_id = s.id
+            LEFT JOIN student_module_selections sms ON sms.response_id = sr.id
+            LEFT JOIN modules m ON m.id = sms.module_id
+            LEFT JOIN student_software_selections sss ON sss.response_id = sr.id
+            LEFT JOIN software sw ON sw.id = sss.software_id
+        `;
+
+        const params = [];
+        if (option) {
+            sql += ` WHERE sr.selected_option = $1`;
+            params.push(option);
+        }
+
+        sql += ` GROUP BY sr.id, s.id ORDER BY sr.submitted_at DESC`;
+
+        const result = await pool.query(sql, params);
+
+        res.json({
+            success: true,
+            data: result.rows,
+            count: result.rowCount,
+            filter: option || 'all'
+        });
+    } catch (error) {
+        console.error('Report error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 }
@@ -217,36 +284,3 @@ export async function getStatistics(req, res) {
     }
 }
 
-// --------------------------- GET REPORT ---------------------------
-export async function getReport(req, res) {
-    try {
-        const { option } = req.query;
-
-        let sql = `
-            SELECT sr.*, s.email, s.index_number, s.year_of_study
-            FROM survey_responses sr
-            JOIN students s ON sr.student_id = s.id
-        `;
-        const params = [];
-
-        if (option) {
-            sql += ` WHERE sr.selected_option = $1`;
-            params.push(option);
-        }
-
-        sql += ` ORDER BY sr.submitted_at DESC`;
-
-        const result = await pool.query(sql, params);
-
-        res.json({
-            success: true,
-            data: result.rows,
-            count: result.rowCount,
-            filter: option || 'all'
-        });
-
-    } catch (error) {
-        console.error('Report error:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-}
