@@ -1,8 +1,7 @@
-import { pool, query } from '../config/database.js';
-
+import { pool, query } from '../config/database.js'; // your pg Pool
 import { getValidModuleIds, getValidSoftwareIds } from '../utils/validationHelpers.js';
 
-
+// --------------------------- GET MODULES ---------------------------
 export async function getModules(req, res) {
     try {
         const result = await pool.query(`
@@ -17,6 +16,7 @@ export async function getModules(req, res) {
     }
 }
 
+// --------------------------- GET SOFTWARE ---------------------------
 export async function getSoftware(req, res) {
     try {
         const result = await pool.query(`
@@ -31,15 +31,12 @@ export async function getSoftware(req, res) {
     }
 }
 
-
-
-
-
+// --------------------------- SUBMIT SURVEY ---------------------------
 export async function submitSurvey(req, res) {
-    const connection = await getConnection();
+    const client = await pool.connect();
 
     try {
-        await connection.beginTransaction();
+        await client.query('BEGIN');
 
         const {
             email,
@@ -53,48 +50,49 @@ export async function submitSurvey(req, res) {
         } = req.body;
 
         if (!email || !indexNumber) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 success: false,
                 error: "Email and index number required"
             });
         }
 
-        // 1. Check or create student
-        const [studentRows] = await connection.execute(
-            "SELECT id FROM students WHERE email = ? AND index_number = ? LIMIT 1",
+        // 1️⃣ Check or create student
+        const studentResult = await client.query(
+            "SELECT id FROM students WHERE email = $1 AND index_number = $2 LIMIT 1",
             [email, indexNumber]
         );
 
         let studentId;
-        if (studentRows.length === 0) {
-            const [insert] = await connection.execute(
-                "INSERT INTO students (email, index_number) VALUES (?, ?)",
+        if (studentResult.rows.length === 0) {
+            const insertStudent = await client.query(
+                "INSERT INTO students (email, index_number) VALUES ($1, $2) RETURNING id",
                 [email, indexNumber]
             );
-            studentId = insert.insertId;
+            studentId = insertStudent.rows[0].id;
         } else {
-            studentId = studentRows[0].id;
+            studentId = studentResult.rows[0].id;
         }
 
-        // 2. Check if already submitted
-        const [existing] = await connection.execute(
-            "SELECT id FROM survey_responses WHERE student_id = ? LIMIT 1",
+        // 2️⃣ Check if already submitted
+        const existing = await client.query(
+            "SELECT id FROM survey_responses WHERE student_id = $1 LIMIT 1",
             [studentId]
         );
 
-        if (existing.length > 0) {
-            await connection.rollback();
+        if (existing.rows.length > 0) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 success: false,
                 error: "You already submitted the survey"
             });
         }
 
-        // 3. Insert survey response
-        await connection.execute(
+        // 3️⃣ Insert survey response
+        await client.query(
             `INSERT INTO survey_responses 
             (student_id, year_of_study, whatsapp_phone, selected_option, selected_modules, selected_software, additional_courses)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [
                 studentId,
                 yearOfStudy,
@@ -106,100 +104,78 @@ export async function submitSurvey(req, res) {
             ]
         );
 
-        await connection.commit();
+        await client.query('COMMIT');
 
-        return res.status(200).json({
+        res.status(200).json({
             success: true,
             message: "Survey submitted successfully"
         });
 
     } catch (error) {
-        await connection.rollback();
+        await client.query('ROLLBACK');
         console.error("Survey submit error:", error);
-        return res.status(500).json({
-            success: false,
-            error: "Server error"
-        });
+        res.status(500).json({ success: false, error: error.message || "Server error" });
+    } finally {
+        client.release();
     }
 }
 
-
-
-
-
-
-
+// --------------------------- GET RESULTS ---------------------------
 export async function getResults(req, res) {
     try {
-        const results = await query(
-            `SELECT sr.*, s.email, s.index_number, s.year_of_study, s.whatsapp_phone
-       FROM survey_responses sr
-       JOIN students s ON sr.student_id = s.id
-       ORDER BY sr.submitted_at DESC`
-        );
+        const result = await pool.query(`
+            SELECT sr.*, s.email, s.index_number, s.year_of_study, s.whatsapp_phone
+            FROM survey_responses sr
+            JOIN students s ON sr.student_id = s.id
+            ORDER BY sr.submitted_at DESC
+        `);
 
         res.json({
             success: true,
-            data: results,
-            count: results.length
+            data: result.rows,
+            count: result.rowCount
         });
-
     } catch (error) {
         console.error('Get results error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        res.status(500).json({ success: false, error: error.message });
     }
 }
 
+// --------------------------- GET STATISTICS ---------------------------
 export async function getStatistics(req, res) {
     try {
-        // Total responses
-        const [totalResponsesRow] = await query('SELECT COUNT(*) as count FROM survey_responses');
-        const totalResponses = totalResponsesRow?.count || 0;
+        const totalResponsesResult = await pool.query('SELECT COUNT(*) AS count FROM survey_responses');
+        const totalStudentsResult = await pool.query('SELECT COUNT(*) AS count FROM students');
+        const totalModuleSelectionsResult = await pool.query('SELECT COUNT(*) AS count FROM student_module_selections');
+        const totalSoftwareSelectionsResult = await pool.query('SELECT COUNT(*) AS count FROM student_software_selections');
 
-        // Total students
-        const [totalStudentsRow] = await query('SELECT COUNT(*) as count FROM students');
-        const totalStudents = totalStudentsRow?.count || 0;
+        const topModulesResult = await pool.query(`
+            SELECT m.id AS module_id, m.name AS module_name, m.is_major AS is_major_module,
+                   COUNT(sms.id) AS selection_count
+            FROM modules m
+            LEFT JOIN student_module_selections sms ON m.id = sms.module_id
+            GROUP BY m.id
+            ORDER BY selection_count DESC
+        `);
 
-        // Total module selections
-        const [totalModuleSelectionsRow] = await query('SELECT COUNT(*) as count FROM student_module_selections');
-        const totalModuleSelections = totalModuleSelectionsRow?.count || 0;
-
-        // Total software selections
-        const [totalSoftwareSelectionsRow] = await query('SELECT COUNT(*) as count FROM student_software_selections');
-        const totalSoftwareSelections = totalSoftwareSelectionsRow?.count || 0;
-
-        // Top modules
-        const topModules = await query(
-            `SELECT m.id AS module_id, m.name AS module_name, m.is_major AS is_major_module, 
-                    COUNT(sms.id) AS selection_count
-             FROM modules m
-             LEFT JOIN student_module_selections sms ON m.id = sms.module_id
-             GROUP BY m.id
-             ORDER BY selection_count DESC`
-        );
-
-        // Top software
-        const topSoftware = await query(
-            `SELECT s.id AS software_id, s.name AS software_name, 
-                    COUNT(sss.id) AS selection_count
-             FROM software s
-             LEFT JOIN student_software_selections sss ON s.id = sss.software_id
-             GROUP BY s.id
-             ORDER BY selection_count DESC`
-        );
+        const topSoftwareResult = await pool.query(`
+            SELECT s.id AS software_id, s.name AS software_name,
+                   COUNT(sss.id) AS selection_count
+            FROM software s
+            LEFT JOIN student_software_selections sss ON s.id = sss.software_id
+            GROUP BY s.id
+            ORDER BY selection_count DESC
+        `);
 
         res.json({
             success: true,
             stats: {
-                totalResponses,
-                totalStudents,
-                totalModuleSelections,
-                totalSoftwareSelections,
-                modulePopularity: topModules,
-                softwarePopularity: topSoftware
+                totalResponses: parseInt(totalResponsesResult.rows[0].count),
+                totalStudents: parseInt(totalStudentsResult.rows[0].count),
+                totalModuleSelections: parseInt(totalModuleSelectionsResult.rows[0].count),
+                totalSoftwareSelections: parseInt(totalSoftwareSelectionsResult.rows[0].count),
+                modulePopularity: topModulesResult.rows,
+                softwarePopularity: topSoftwareResult.rows
             }
         });
     } catch (error) {
@@ -208,41 +184,36 @@ export async function getStatistics(req, res) {
     }
 }
 
-
-
-
+// --------------------------- GET REPORT ---------------------------
 export async function getReport(req, res) {
     try {
         const { option } = req.query;
 
-        let sql = `SELECT sr.*, s.email, s.index_number, s.year_of_study
-               FROM survey_responses sr
-               JOIN students s ON sr.student_id = s.id`;
-
+        let sql = `
+            SELECT sr.*, s.email, s.index_number, s.year_of_study
+            FROM survey_responses sr
+            JOIN students s ON sr.student_id = s.id
+        `;
         const params = [];
 
         if (option) {
-            sql += ` WHERE sr.selected_option = ?`;
+            sql += ` WHERE sr.selected_option = $1`;
             params.push(option);
         }
 
         sql += ` ORDER BY sr.submitted_at DESC`;
 
-        const results = await query(sql, params);
+        const result = await pool.query(sql, params);
 
         res.json({
             success: true,
-            data: results,
-            count: results.length,
+            data: result.rows,
+            count: result.rowCount,
             filter: option || 'all'
         });
 
     } catch (error) {
         console.error('Report error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        res.status(500).json({ success: false, error: error.message });
     }
 }
-
