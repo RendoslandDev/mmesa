@@ -51,7 +51,6 @@ const ModuleSelectionPage = ({
                     resModules.data.forEach((mod) => {
                         mod.parentId = mod.parent_id;
 
-                        // FIX: Define module type
                         mod.isMajor = !mod.parent_id;
                         mod.isSub = !!mod.parent_id;
 
@@ -65,6 +64,7 @@ const ModuleSelectionPage = ({
                             if (parent) parent.subModules.push(mod);
                         }
                     });
+
 
                     setModuleCategories(categories);
                 } else {
