@@ -115,10 +115,11 @@ export async function submitSurvey(req, res) {
             const validModuleIds = await getValidModuleIds(selectedModules); // helper function
             for (const moduleId of validModuleIds) {
                 await client.query(
-                    `INSERT INTO student_module_selections (response_id, module_id)
-                     VALUES ($1, $2)`,
-                    [surveyId, moduleId]
+                    `INSERT INTO student_module_selections (response_id, student_id, module_id)
+     VALUES ($1, $2, $3)`,
+                    [surveyId, studentId, moduleId]
                 );
+
             }
         }
 
@@ -127,10 +128,11 @@ export async function submitSurvey(req, res) {
             const validSoftwareIds = await getValidSoftwareIds(selectedSoftware); // helper function
             for (const softwareId of validSoftwareIds) {
                 await client.query(
-                    `INSERT INTO student_software_selections (response_id, software_id)
-                     VALUES ($1, $2)`,
-                    [surveyId, softwareId]
+                    `INSERT INTO student_software_selections (response_id, student_id, software_id)
+     VALUES ($1, $2, $3)`,
+                    [surveyId, studentId, softwareId]
                 );
+
             }
         }
 
