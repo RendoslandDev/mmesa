@@ -244,10 +244,22 @@ export async function getReport(req, res) {
 // --------------------------- GET STATISTICS ---------------------------
 export async function getStatistics(req, res) {
     try {
-        const totalResponsesResult = await pool.query('SELECT COUNT(*) AS count FROM survey_responses');
-        const totalStudentsResult = await pool.query('SELECT COUNT(*) AS count FROM students');
-        const totalModuleSelectionsResult = await pool.query('SELECT COUNT(*) AS count FROM student_module_selections');
-        const totalSoftwareSelectionsResult = await pool.query('SELECT COUNT(*) AS count FROM student_software_selections');
+        const totalResponsesResult = await pool.query(
+            'SELECT COUNT(*) AS count FROM survey_responses'
+        );
+
+        const totalStudentsResult = await pool.query(
+            'SELECT COUNT(*) AS count FROM students'
+        );
+
+        // 👇 FIXED — unique students, not total rows
+        const totalModuleSelectionsResult = await pool.query(
+            'SELECT COUNT(DISTINCT student_id) AS count FROM student_module_selections'
+        );
+
+        const totalSoftwareSelectionsResult = await pool.query(
+            'SELECT COUNT(DISTINCT student_id) AS count FROM student_software_selections'
+        );
 
         const topModulesResult = await pool.query(`
             SELECT m.id AS module_id, m.name AS module_name, m.is_major AS is_major_module,
@@ -272,12 +284,16 @@ export async function getStatistics(req, res) {
             stats: {
                 totalResponses: parseInt(totalResponsesResult.rows[0].count),
                 totalStudents: parseInt(totalStudentsResult.rows[0].count),
+
+                // 👇 FIXED
                 totalModuleSelections: parseInt(totalModuleSelectionsResult.rows[0].count),
                 totalSoftwareSelections: parseInt(totalSoftwareSelectionsResult.rows[0].count),
+
                 modulePopularity: topModulesResult.rows,
                 softwarePopularity: topSoftwareResult.rows
             }
         });
+
     } catch (error) {
         console.error('Statistics error:', error);
         res.status(500).json({ success: false, error: error.message });
