@@ -91,18 +91,11 @@ export async function submitSurvey(req, res) {
         // 3️⃣ Insert survey response
         await client.query(
             `INSERT INTO survey_responses 
-            (student_id, year_of_study, whatsapp_phone, selected_option, selected_modules, selected_software, additional_courses)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [
-                studentId,
-                yearOfStudy,
-                whatsappPhone,
-                selectedOption,
-                JSON.stringify(selectedModules),
-                JSON.stringify(selectedSoftware),
-                additionalCourses || null
-            ]
+    (student_id, selected_option, additional_courses)
+   VALUES ($1, $2, $3)`,
+            [studentId, selectedOption, additionalCourses || null]
         );
+
 
         await client.query('COMMIT');
 
